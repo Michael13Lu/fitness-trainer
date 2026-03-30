@@ -5,3 +5,5 @@ langchain-community
 langchain-classic
 streamlit
 python-dotenv
+audio-recorder-streamlit
+groq
