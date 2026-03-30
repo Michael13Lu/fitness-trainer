@@ -1,6 +1,7 @@
 langchain
-langchain-openai
-langgraph
-langsmith
+langchain-core
+langchain-groq
+langchain-community
+langchain-classic
+streamlit
 python-dotenv
-openai
