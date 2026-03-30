@@ -25,14 +25,6 @@ with st.sidebar:
     level = st.selectbox("Уровень подготовки", ["Новичок", "Средний", "Продвинутый"])
     trainer_style = st.selectbox("Стиль тренера", ["Мотивирующий", "Строгий", "Мягкий и поддерживающий"])
 
-    st.divider()
-    uploaded_image = st.file_uploader(
-        "📎 Фото еды или тренажёра",
-        type=["jpg", "jpeg", "png", "webp"],
-    )
-    if uploaded_image:
-        st.image(uploaded_image, use_container_width=True)
-
     if st.button("🗑️ Очистить чат"):
         st.session_state.history = ChatMessageHistory()
         st.session_state.messages = []
@@ -106,14 +98,24 @@ for msg in st.session_state.messages:
             st.image(msg["image"], width=200)
         st.markdown(msg["content"])
 
-# --- Поле ввода ---
-if user_input := st.chat_input("Напиши тренеру..." if not uploaded_image else "Напиши вопрос к фото и отправь..."):
+# --- Поле ввода с поддержкой фото ---
+# accept_file=True добавляет кнопку скрепки прямо в поле ввода
+msg = st.chat_input(
+    "Напиши тренеру или прикрепи фото...",
+    accept_file=True,
+    file_type=["jpg", "jpeg", "png", "webp"],
+)
+
+if msg:
+    user_input = msg.text or ""
+    uploaded_image = msg["files"][0] if msg["files"] else None
 
     # Показываем сообщение пользователя
     with st.chat_message("user"):
         if uploaded_image:
             st.image(uploaded_image, width=200)
-        st.markdown(user_input or "_(фото)_")
+        if user_input:
+            st.markdown(user_input)
 
     image_data = uploaded_image.read() if uploaded_image else None
     mime = uploaded_image.type if uploaded_image else None
