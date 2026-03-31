@@ -96,6 +96,20 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
     return "\n".join(lines)
 
 
+def get_workouts_by_date(user_name: str, workout_date: str) -> list:
+    """Все упражнения за конкретную дату."""
+    init_workout_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT exercise, muscle_group, sets, reps, weight_kg, notes
+            FROM workouts WHERE user_name = ? AND workout_date = ?
+            ORDER BY id ASC
+        """, (user_name, workout_date)).fetchall()
+    return [{"exercise": r[0], "muscle_group": r[1],
+             "sets": r[2], "reps": r[3], "weight": r[4], "notes": r[5]}
+            for r in rows]
+
+
 def delete_last_exercise(user_name: str):
     init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
