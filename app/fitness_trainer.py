@@ -23,8 +23,19 @@ from translations import LANGUAGES, t
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
 from googleapiclient.discovery import build as gcal_build
+import datetime as _dt
 
 load_dotenv()
+
+
+def _calc_realistic_date(current_weight: float, target_weight: float) -> _dt.date | None:
+    """Возвращает реалистичную дату цели (~0.5 кг/нед для похудения, 0.3 для набора)."""
+    if not target_weight or target_weight <= 0:
+        return None
+    kg_diff = abs(current_weight - target_weight)
+    rate = 0.5 if current_weight > target_weight else 0.3
+    weeks = kg_diff / rate
+    return _dt.date.today() + _dt.timedelta(weeks=weeks)
 
 st.set_page_config(page_title="Fitness Trainer", page_icon="💪", layout="wide")
 
@@ -124,13 +135,20 @@ with st.sidebar:
             value=float(_prof["target_weight"]), step=0.5,
             help="0 = не задано"
         )
-        import datetime as _dt
         _default_date = (
             _dt.date.fromisoformat(_prof["target_date"])
             if _prof.get("target_date") else _dt.date.today() + _dt.timedelta(weeks=12)
         )
         _target_date = st.date_input(t(lang, "target_date"), value=_default_date)
         _prof["target_date"] = str(_target_date)
+
+        # Кнопка "принять реалистичную дату"
+        _real_date = _calc_realistic_date(float(_prof["weight"]), float(_prof["target_weight"]))
+        if _real_date and _real_date != _target_date:
+            if st.button(f"✅ {_real_date}", use_container_width=True, help=t(lang, "accept_realistic_date")):
+                _prof["target_date"] = str(_real_date)
+                save_profile(_prof["name"], _prof)
+                st.rerun()
 
         save_profile(_prof["name"], _prof)
 
