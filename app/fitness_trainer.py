@@ -19,10 +19,30 @@ from memory_store import load_messages, save_message, clear_history, save_langua
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise)
 from translations import LANGUAGES, t
+from google_calendar import (is_configured, get_auth_url, exchange_code,
+                              creds_to_dict, creds_from_dict, add_workout_event)
 
 load_dotenv()
 
 st.set_page_config(page_title="Fitness Trainer", page_icon="💪", layout="wide")
+
+# ============================================================
+# GOOGLE CALENDAR — OAuth callback
+# ============================================================
+if "gcal_creds" not in st.session_state:
+    st.session_state.gcal_creds = None
+
+_params = st.query_params
+if "code" in _params and st.session_state.gcal_creds is None:
+    try:
+        creds = exchange_code(_params["code"])
+        st.session_state.gcal_creds = creds_to_dict(creds)
+        st.query_params.clear()
+        st.success("✅ Google Calendar connected!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Google Calendar auth error: {e}")
+        st.query_params.clear()
 
 # ============================================================
 # ЯЗЫК — выбирается первым, до всего остального
@@ -61,6 +81,19 @@ with st.sidebar:
         st.session_state.history = ChatMessageHistory()
         st.session_state.messages = []
         st.rerun()
+
+    st.divider()
+    st.markdown("**📅 Google Calendar**")
+    if st.session_state.gcal_creds:
+        st.success("Connected ✓")
+        if st.button("🔌 Disconnect"):
+            st.session_state.gcal_creds = None
+            st.rerun()
+    elif is_configured():
+        auth_url = get_auth_url()
+        st.link_button("🔗 Connect Google Calendar", auth_url)
+    else:
+        st.caption("Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable")
 
 # ============================================================
 # ИСТОРИЯ ИЗ БД
@@ -364,13 +397,35 @@ with tab_diary:
             if w_exercise:
                 add_exercise(name, str(w_date), w_exercise, w_muscle, w_sets, w_reps, w_weight, w_notes)
                 st.success(f"{t(lang, 'recorded')}: {w_exercise}")
+                st.session_state.last_saved = {
+                    "date": str(w_date), "exercise": w_exercise,
+                    "muscle_group": w_muscle, "sets": w_sets,
+                    "reps": w_reps, "weight": w_weight, "notes": w_notes,
+                }
                 st.rerun()
             else:
                 st.warning(t(lang, "enter_exercise"))
     with col_del:
         if st.button(t(lang, "delete_last"), use_container_width=True):
             delete_last_exercise(name)
+            st.session_state.pop("last_saved", None)
             st.rerun()
+
+    # Add last saved workout to Google Calendar
+    if st.session_state.get("last_saved") and st.session_state.gcal_creds:
+        ls = st.session_state.last_saved
+        if st.button("📅 Add to Google Calendar", use_container_width=True):
+            try:
+                creds = creds_from_dict(st.session_state.gcal_creds)
+                event_url = add_workout_event(
+                    creds, ls["date"], ls["exercise"], ls["muscle_group"],
+                    ls["sets"], ls["reps"], ls["weight"], ls["notes"]
+                )
+                st.session_state.gcal_creds = creds_to_dict(creds)
+                st.session_state.pop("last_saved", None)
+                st.success(f"Added to Google Calendar! [Open event]({event_url})")
+            except Exception as e:
+                st.error(f"Calendar error: {e}")
 
     st.divider()
     st.subheader(t(lang, "workout_history"))
