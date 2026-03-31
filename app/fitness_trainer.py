@@ -61,6 +61,7 @@ with st.sidebar:
     # Сохраняем выбор в session_state сразу
     if lang_name != st.session_state.lang_name:
         st.session_state.lang_name = lang_name
+        st.rerun()
 
 st.title(t(lang, "app_title"))
 
