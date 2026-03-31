@@ -726,17 +726,47 @@ with tab_food:
 
     f_date = st.date_input(t(lang, "date"), value=date.today(), key="f_date")
 
+    # Автозаполнение КБЖУ по названию продукта
+    def _autofill_macros():
+        _food = st.session_state.get("f_name", "").strip()
+        _w = st.session_state.get("f_weight", 100.0)
+        if not _food:
+            return
+        import re as _re_af, json as _json_af
+        _prompt = (
+            f"Nutrition facts for '{_food}', {_w}g portion. "
+            "Return ONLY JSON: {\"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0}. "
+            "All values as numbers per the given weight. No text, no markdown."
+        )
+        try:
+            _resp = llm_text.invoke(_prompt).content.strip()
+            _m = _re_af.search(r'\{.*\}', _resp, _re_af.DOTALL)
+            if _m:
+                _d = _json_af.loads(_m.group())
+                st.session_state["f_cal"] = float(_d.get("calories", 0))
+                st.session_state["f_prot"] = float(_d.get("protein", 0))
+                st.session_state["f_fat"] = float(_d.get("fat", 0))
+                st.session_state["f_carb"] = float(_d.get("carbs", 0))
+        except Exception:
+            pass
+
     # --- Форма добавления ---
     col_f1, col_f2 = st.columns(2)
     with col_f1:
         f_meal = st.selectbox(t(lang, "meal_type"), t(lang, "meal_types"), key="f_meal")
-        f_name = st.text_input(t(lang, "food_name"), placeholder=t(lang, "food_placeholder"), key="f_name")
-        f_weight = st.number_input(t(lang, "food_weight"), min_value=0.0, max_value=5000.0, value=100.0, step=10.0, key="f_weight")
+        f_name = st.text_input(
+            t(lang, "food_name"), placeholder=t(lang, "food_placeholder"),
+            key="f_name", on_change=_autofill_macros,
+        )
+        f_weight = st.number_input(
+            t(lang, "food_weight"), min_value=0.0, max_value=5000.0,
+            value=100.0, step=10.0, key="f_weight", on_change=_autofill_macros,
+        )
     with col_f2:
-        f_cal = st.number_input(t(lang, "calories"), min_value=0.0, max_value=5000.0, value=0.0, step=1.0, key="f_cal")
-        f_prot = st.number_input(t(lang, "protein"), min_value=0.0, max_value=500.0, value=0.0, step=0.5, key="f_prot")
-        f_fat = st.number_input(t(lang, "fat"), min_value=0.0, max_value=500.0, value=0.0, step=0.5, key="f_fat")
-        f_carb = st.number_input(t(lang, "carbs"), min_value=0.0, max_value=500.0, value=0.0, step=0.5, key="f_carb")
+        f_cal = st.number_input(t(lang, "calories"), min_value=0.0, max_value=5000.0, step=1.0, key="f_cal")
+        f_prot = st.number_input(t(lang, "protein"), min_value=0.0, max_value=500.0, step=0.5, key="f_prot")
+        f_fat = st.number_input(t(lang, "fat"), min_value=0.0, max_value=500.0, step=0.5, key="f_fat")
+        f_carb = st.number_input(t(lang, "carbs"), min_value=0.0, max_value=500.0, step=0.5, key="f_carb")
 
     col_fadd, col_fdel = st.columns([0.3, 0.7])
     with col_fadd:
@@ -744,6 +774,10 @@ with tab_food:
             if f_name:
                 add_food(name, str(f_date), f_meal, f_name,
                          f_cal, f_prot, f_fat, f_carb, f_weight)
+                # Сбрасываем поля для следующего продукта
+                for _k in ("f_name", "f_cal", "f_prot", "f_fat", "f_carb"):
+                    st.session_state.pop(_k, None)
+                st.session_state["f_weight"] = 100.0
                 st.success(f"{t(lang, 'recorded')}: {f_name}")
                 st.rerun()
             else:
