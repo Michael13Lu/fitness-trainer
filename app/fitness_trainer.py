@@ -65,37 +65,82 @@ with st.sidebar:
 st.title(t(lang, "app_title"))
 
 # ============================================================
-# ПРОФИЛЬ
+# САЙДБАР — АККОРДЕОН
 # ============================================================
+if "sidebar_section" not in st.session_state:
+    st.session_state.sidebar_section = "profile"
+
+# Сохраняем профиль в session_state чтобы не терять при переключении разделов
+_prof = st.session_state.setdefault("profile", {
+    "name": "Михаил", "age": 25, "weight": 75, "height": 175,
+    "goal_idx": 0, "level_idx": 0, "style_idx": 0,
+})
+
 with st.sidebar:
-    st.header(t(lang, "profile"))
-    name = st.text_input(t(lang, "name"), value="Михаил")
-    age = st.number_input(t(lang, "age"), min_value=10, max_value=100, value=25)
-    weight = st.number_input(t(lang, "weight"), min_value=30, max_value=200, value=75)
-    height = st.number_input(t(lang, "height"), min_value=100, max_value=250, value=175)
-    goal = st.selectbox(t(lang, "goal"), t(lang, "goals"))
-    level = st.selectbox(t(lang, "level"), t(lang, "levels"))
-    trainer_style = st.selectbox(t(lang, "trainer_style"), t(lang, "styles"))
-    st.divider()
-    voice_response = st.toggle(t(lang, "speak_toggle"), value=False)
-    if st.button(t(lang, "clear_chat")):
-        clear_history(name)
-        st.session_state.history = ChatMessageHistory()
-        st.session_state.messages = []
-        st.rerun()
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("👤 " + t(lang, "profile"), use_container_width=True):
+            st.session_state.sidebar_section = "profile"
+    with c2:
+        if st.button("🔊", use_container_width=True):
+            st.session_state.sidebar_section = "voice"
+    with c3:
+        cal_label = "📅 ✓" if st.session_state.gcal_creds else "📅"
+        if st.button(cal_label, use_container_width=True):
+            st.session_state.sidebar_section = "calendar"
 
     st.divider()
-    st.markdown("**📅 Google Calendar**")
-    if st.session_state.gcal_creds:
-        st.success("Connected ✓")
-        if st.button("🔌 Disconnect"):
-            st.session_state.gcal_creds = None
+
+    # ── Профиль ──────────────────────────────────────────────
+    if st.session_state.sidebar_section == "profile":
+        _prof["name"] = st.text_input(t(lang, "name"), value=_prof["name"])
+        _prof["age"] = st.number_input(t(lang, "age"), min_value=10, max_value=100, value=_prof["age"])
+        _prof["weight"] = st.number_input(t(lang, "weight"), min_value=30, max_value=200, value=_prof["weight"])
+        _prof["height"] = st.number_input(t(lang, "height"), min_value=100, max_value=250, value=_prof["height"])
+        goals_list = t(lang, "goals")
+        _prof["goal_idx"] = min(_prof["goal_idx"], len(goals_list) - 1)
+        _prof["goal_idx"] = goals_list.index(st.selectbox(t(lang, "goal"), goals_list, index=_prof["goal_idx"]))
+        levels_list = t(lang, "levels")
+        _prof["level_idx"] = min(_prof["level_idx"], len(levels_list) - 1)
+        _prof["level_idx"] = levels_list.index(st.selectbox(t(lang, "level"), levels_list, index=_prof["level_idx"]))
+        styles_list = t(lang, "styles")
+        _prof["style_idx"] = min(_prof["style_idx"], len(styles_list) - 1)
+        _prof["style_idx"] = styles_list.index(st.selectbox(t(lang, "trainer_style"), styles_list, index=_prof["style_idx"]))
+
+    # ── Голос и чат ──────────────────────────────────────────
+    elif st.session_state.sidebar_section == "voice":
+        voice_response = st.toggle(t(lang, "speak_toggle"), value=False)
+        st.write("")
+        if st.button(t(lang, "clear_chat"), use_container_width=True):
+            clear_history(_prof["name"])
+            st.session_state.history = ChatMessageHistory()
+            st.session_state.messages = []
             st.rerun()
-    elif is_configured():
-        auth_url = get_auth_url()
-        st.link_button("🔗 Connect Google Calendar", auth_url)
-    else:
-        st.caption("Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable")
+
+    # ── Google Calendar ───────────────────────────────────────
+    elif st.session_state.sidebar_section == "calendar":
+        st.markdown("**📅 Google Calendar**")
+        if st.session_state.gcal_creds:
+            st.success("Connected ✓")
+            if st.button("🔌 Disconnect", use_container_width=True):
+                st.session_state.gcal_creds = None
+                st.rerun()
+        elif is_configured():
+            auth_url = get_auth_url()
+            st.link_button("🔗 Connect Google Calendar", auth_url, use_container_width=True)
+        else:
+            st.caption("Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable")
+
+# Читаем профиль из session_state (всегда доступны)
+name = _prof["name"]
+age = _prof["age"]
+weight = _prof["weight"]
+height = _prof["height"]
+goal = t(lang, "goals")[_prof["goal_idx"]]
+level = t(lang, "levels")[_prof["level_idx"]]
+trainer_style = t(lang, "styles")[_prof["style_idx"]]
+if st.session_state.sidebar_section != "voice":
+    voice_response = False
 
 # ============================================================
 # ИСТОРИЯ ИЗ БД
