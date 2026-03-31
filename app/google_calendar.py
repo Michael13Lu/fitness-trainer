@@ -1,10 +1,15 @@
 import os
-from datetime import datetime, timedelta
+import json
+import hashlib
+import secrets
+import base64
+import sqlite3
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
+DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
 
 
 def _client_config() -> dict:
@@ -19,7 +24,6 @@ def _client_config() -> dict:
 
 
 def _redirect_uri() -> str:
-    # Auto-detect: on Streamlit Cloud uses the real app URL, locally uses localhost
     try:
         import streamlit as st
         from urllib.parse import urlparse
@@ -33,18 +37,72 @@ def is_configured() -> bool:
     return bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
 
 
-def get_auth_url() -> tuple:
-    """Returns (auth_url, flow) — store the flow in session_state for exchange_code."""
+# ── PKCE helpers (store verifier in SQLite so it survives redirect) ──────────
+
+def _init_pkce_table():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS oauth_pkce (
+                state TEXT PRIMARY KEY,
+                code_verifier TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+
+def _save_verifier(state: str, code_verifier: str):
+    _init_pkce_table()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO oauth_pkce (state, code_verifier) VALUES (?, ?)",
+            (state, code_verifier)
+        )
+
+
+def _load_verifier(state: str) -> str:
+    _init_pkce_table()
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT code_verifier FROM oauth_pkce WHERE state = ?", (state,)
+        ).fetchone()
+        if row:
+            conn.execute("DELETE FROM oauth_pkce WHERE state = ?", (state,))
+    return row[0] if row else ""
+
+
+def _make_pkce():
+    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()
+    ).rstrip(b"=").decode()
+    return verifier, challenge
+
+
+# ── OAuth flow ────────────────────────────────────────────────────────────────
+
+def get_auth_url() -> str:
+    verifier, challenge = _make_pkce()
     flow = Flow.from_client_config(_client_config(), scopes=SCOPES, redirect_uri=_redirect_uri())
-    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
-    return auth_url, flow
+    auth_url, state = flow.authorization_url(
+        prompt="consent",
+        access_type="offline",
+        code_challenge=challenge,
+        code_challenge_method="S256",
+    )
+    _save_verifier(state, verifier)
+    return auth_url
 
 
-def exchange_code(flow, code: str) -> Credentials:
-    """Pass the same flow object returned by get_auth_url."""
-    flow.fetch_token(code=code)
+def exchange_code(code: str, state: str) -> Credentials:
+    verifier = _load_verifier(state)
+    flow = Flow.from_client_config(
+        _client_config(), scopes=SCOPES, redirect_uri=_redirect_uri(), state=state
+    )
+    flow.fetch_token(code=code, code_verifier=verifier)
     return flow.credentials
 
+
+# ── Credentials serialization ─────────────────────────────────────────────────
 
 def creds_to_dict(creds: Credentials) -> dict:
     return {
@@ -68,10 +126,11 @@ def creds_from_dict(d: dict) -> Credentials:
     )
 
 
+# ── Calendar event ────────────────────────────────────────────────────────────
+
 def add_workout_event(creds: Credentials, workout_date: str, exercise: str,
                       muscle_group: str, sets: int, reps: int,
                       weight_kg: float, notes: str = "") -> str:
-    """Adds a workout as an all-day event to Google Calendar. Returns the event URL."""
     service = build("calendar", "v3", credentials=creds)
 
     description_lines = [
@@ -88,7 +147,7 @@ def add_workout_event(creds: Credentials, workout_date: str, exercise: str,
         "description": "\n".join(description_lines),
         "start": {"date": str(workout_date)},
         "end": {"date": str(workout_date)},
-        "colorId": "2",  # green
+        "colorId": "2",
     }
 
     created = service.events().insert(calendarId="primary", body=event).execute()
