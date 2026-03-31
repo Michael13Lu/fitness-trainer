@@ -775,9 +775,8 @@ with tab_food:
                 add_food(name, str(f_date), f_meal, f_name,
                          f_cal, f_prot, f_fat, f_carb, f_weight)
                 # Сбрасываем поля для следующего продукта
-                for _k in ("f_name", "f_cal", "f_prot", "f_fat", "f_carb"):
+                for _k in ("f_name", "f_cal", "f_prot", "f_fat", "f_carb", "f_weight"):
                     st.session_state.pop(_k, None)
-                st.session_state["f_weight"] = 100.0
                 st.success(f"{t(lang, 'recorded')}: {f_name}")
                 st.rerun()
             else:
