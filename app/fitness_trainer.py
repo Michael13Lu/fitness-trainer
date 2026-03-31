@@ -721,7 +721,8 @@ with tab_diary:
 # ============================================================
 # ВКЛАДКА 3: ПИТАНИЕ
 # ============================================================
-with tab_food:
+@st.fragment
+def _render_food_tab():
     st.subheader(t(lang, "food_title"))
 
     f_date = st.date_input(t(lang, "date"), value=date.today(), key="f_date")
@@ -916,6 +917,9 @@ with tab_food:
             st.markdown(f"**{_entry['meal_type']}** — {_details}")
     else:
         st.info(t(lang, "no_food"))
+
+with tab_food:
+    _render_food_tab()
 
 # ============================================================
 # ВКЛАДКА 4: АНАЛИЗ
