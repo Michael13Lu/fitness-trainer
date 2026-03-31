@@ -15,38 +15,59 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_community.chat_message_histories import ChatMessageHistory
 from audio_recorder_streamlit import audio_recorder
 from groq import Groq
-from memory_store import load_messages, save_message, clear_history
+from memory_store import load_messages, save_message, clear_history, save_language, load_language
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise)
+from translations import LANGUAGES, t
 
 load_dotenv()
 
-st.set_page_config(page_title="Фитнес-тренер", page_icon="💪", layout="wide")
-st.title("💪 Персональный фитнес-тренер")
+st.set_page_config(page_title="Fitness Trainer", page_icon="💪", layout="wide")
+
+# ============================================================
+# ЯЗЫК — выбирается первым, до всего остального
+# ============================================================
+# Загружаем сохранённый язык из session_state (сохраняется в БД после выбора имени)
+if "lang_name" not in st.session_state:
+    st.session_state.lang_name = "Русский"
 
 with st.sidebar:
-    st.header("👤 Твой профиль")
-    name = st.text_input("Имя", value="Михаил")
-    age = st.number_input("Возраст", min_value=10, max_value=100, value=25)
-    weight = st.number_input("Вес (кг)", min_value=30, max_value=200, value=75)
-    height = st.number_input("Рост (см)", min_value=100, max_value=250, value=175)
-    goal = st.selectbox("Цель", ["Похудеть", "Набрать мышечную массу", "Поддерживать форму", "Улучшить выносливость"])
-    level = st.selectbox("Уровень подготовки", ["Новичок", "Средний", "Продвинутый"])
-    trainer_style = st.selectbox("Стиль тренера", ["Мотивирующий", "Строгий", "Мягкий и поддерживающий"])
-    st.divider()
-    voice_response = st.toggle("🔊 Тренер говорит вслух", value=False)
+    lang_list = list(LANGUAGES.keys())
+    saved_idx = lang_list.index(st.session_state.lang_name) if st.session_state.lang_name in lang_list else 0
+    lang_name = st.selectbox("🌐 Language / Язык", lang_list, index=saved_idx)
+    lang = LANGUAGES[lang_name]
+    # Сохраняем выбор в session_state сразу
+    if lang_name != st.session_state.lang_name:
+        st.session_state.lang_name = lang_name
 
-    if st.button("🗑️ Очистить чат"):
+st.title(t(lang, "app_title"))
+
+# ============================================================
+# ПРОФИЛЬ
+# ============================================================
+with st.sidebar:
+    st.header(t(lang, "profile"))
+    name = st.text_input(t(lang, "name"), value="Михаил")
+    age = st.number_input(t(lang, "age"), min_value=10, max_value=100, value=25)
+    weight = st.number_input(t(lang, "weight"), min_value=30, max_value=200, value=75)
+    height = st.number_input(t(lang, "height"), min_value=100, max_value=250, value=175)
+    goal = st.selectbox(t(lang, "goal"), t(lang, "goals"))
+    level = st.selectbox(t(lang, "level"), t(lang, "levels"))
+    trainer_style = st.selectbox(t(lang, "trainer_style"), t(lang, "styles"))
+    st.divider()
+    voice_response = st.toggle(t(lang, "speak_toggle"), value=False)
+    if st.button(t(lang, "clear_chat")):
         clear_history(name)
         st.session_state.history = ChatMessageHistory()
         st.session_state.messages = []
         st.rerun()
 
-# Загружаем историю из БД при первом запуске сессии
+# ============================================================
+# ИСТОРИЯ ИЗ БД
+# ============================================================
 if "history" not in st.session_state:
     st.session_state.history = ChatMessageHistory()
-    saved = load_messages(name)
-    for msg in saved:
+    for msg in load_messages(name):
         if msg["role"] == "user":
             st.session_state.history.add_user_message(msg["content"])
         else:
@@ -57,34 +78,49 @@ if "messages" not in st.session_state:
 
 if "loaded_for" not in st.session_state:
     st.session_state.loaded_for = name
+    # Загружаем язык из БД при первом запуске
+    saved_lang = load_language(name)
+    if saved_lang != st.session_state.lang_name:
+        st.session_state.lang_name = saved_lang
+        st.rerun()
 elif st.session_state.loaded_for != name:
-    # Имя изменилось — загружаем историю другого пользователя
     st.session_state.history = ChatMessageHistory()
-    saved = load_messages(name)
-    for msg in saved:
+    for msg in load_messages(name):
         if msg["role"] == "user":
             st.session_state.history.add_user_message(msg["content"])
         else:
             st.session_state.history.add_ai_message(msg["content"])
     st.session_state.messages = load_messages(name)
     st.session_state.loaded_for = name
+    # Загружаем язык нового пользователя
+    saved_lang = load_language(name)
+    if saved_lang != st.session_state.lang_name:
+        st.session_state.lang_name = saved_lang
+        st.rerun()
 
+# Сохраняем текущий выбор языка в БД
+save_language(name, lang_name)
+
+# ============================================================
+# МОДЕЛИ И ЦЕПОЧКА
+# ============================================================
 llm_text = ChatGroq(model="llama-3.1-8b-instant", temperature=0.7)
 llm_vision = ChatGroq(model="meta-llama/llama-4-scout-17b-16e-instruct", temperature=0.7)
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-system_prompt = """Ты — персональный фитнес-тренер и диетолог.
+system_prompt = """You are a personal fitness trainer and nutritionist.
 
-Информация о клиенте:
-- Имя: {name}
-- Возраст: {age} лет
-- Вес: {weight} кг, Рост: {height} см
-- Цель: {goal}
-- Уровень подготовки: {level}
-- Твой стиль общения: {trainer_style}
+Client info:
+- Name: {name}
+- Age: {age}
+- Weight: {weight} kg, Height: {height} cm
+- Goal: {goal}
+- Fitness level: {level}
+- Your communication style: {trainer_style}
 
-Ты даёшь конкретные советы по тренировкам и питанию, учитывая профиль клиента.
-Мотивируй и поддерживай. Отвечай на русском языке. Будь конкретным и практичным."""
+Give specific advice on training and nutrition based on the client's profile.
+Motivate and support. Be concrete and practical.
+{lang_instruction}"""
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
@@ -93,12 +129,23 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 chain = prompt | llm_text | StrOutputParser()
 
+MUSCLE_GROUPS = t(lang, "muscle_groups")
+
+
+def get_chain_input(user_input: str) -> dict:
+    return {
+        "name": name, "age": age, "weight": weight, "height": height,
+        "goal": goal, "level": level, "trainer_style": trainer_style,
+        "lang_instruction": t(lang, "system_prompt_lang"),
+        "history": st.session_state.history.messages,
+        "input": user_input,
+    }
+
 
 def transcribe_audio(audio_bytes: bytes) -> str:
     result = groq_client.audio.transcriptions.create(
         file=("voice.wav", audio_bytes),
         model="whisper-large-v3",
-        language="ru",
     )
     return result.text
 
@@ -106,12 +153,12 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 def get_system_text():
     return system_prompt.format(
         name=name, age=age, weight=weight, height=height,
-        goal=goal, level=level, trainer_style=trainer_style
+        goal=goal, level=level, trainer_style=trainer_style,
+        lang_instruction=t(lang, "system_prompt_lang")
     )
 
 
 def extract_text_from_file(file) -> str:
-    """Извлекает текст из PDF или CSV файла."""
     if file.name.endswith(".pdf"):
         reader = PdfReader(io.BytesIO(file.read()))
         return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
@@ -122,13 +169,14 @@ def extract_text_from_file(file) -> str:
 
 
 def speak(text: str):
-    """Озвучивает текст через браузер (Web Speech API)."""
+    lang_map = {"ru": "ru-RU", "en": "en-US", "es": "es-ES",
+                "de": "de-DE", "fr": "fr-FR", "he": "he-IL"}
     clean = text.replace("`", "").replace("*", "").replace("#", "")
     js = f"""
     <script>
     window.speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance({json.dumps(clean)});
-    u.lang = 'ru-RU';
+    u.lang = '{lang_map.get(lang, "en-US")}';
     u.rate = 1.0;
     window.speechSynthesis.speak(u);
     </script>
@@ -142,14 +190,39 @@ def analyze_with_image(image_bytes: bytes, mime_type: str, user_text: str) -> st
         SystemMessage(content=get_system_text()),
         HumanMessage(content=[
             {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
-            {"type": "text", "text": user_text or "Проанализируй фото и дай совет исходя из моего профиля."},
+            {"type": "text", "text": user_text or "Analyze this photo and give advice based on my profile."},
         ]),
     ]
     return llm_vision.invoke(messages).content
 
 
-# === ВКЛАДКИ ===
-tab_chat, tab_diary, tab_analysis = st.tabs(["💬 Чат с тренером", "📓 Дневник тренировок", "📊 Анализ прогресса"])
+def extract_exercise_from_image(image_bytes: bytes, mime_type: str) -> dict:
+    muscle_list = "/".join(MUSCLE_GROUPS)
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
+    messages = [
+        HumanMessage(content=[
+            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
+            {"type": "text", "text": f"""Look at the photo of the exercise machine or exercise.
+Reply ONLY in JSON format, no extra text:
+{{"exercise": "exercise name", "muscle_group": "one of: {muscle_list}"}}
+If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}}"""},
+        ]),
+    ]
+    try:
+        result = llm_vision.invoke(messages).content
+        start = result.find("{")
+        end = result.rfind("}") + 1
+        return json.loads(result[start:end])
+    except Exception:
+        return {"exercise": "", "muscle_group": ""}
+
+
+# ============================================================
+# ВКЛАДКИ
+# ============================================================
+tab_chat, tab_diary, tab_analysis = st.tabs([
+    t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_analysis")
+])
 
 # ============================================================
 # ВКЛАДКА 1: ЧАТ
@@ -161,36 +234,26 @@ with tab_chat:
                 st.image(msg["image"], width=200)
             st.markdown(msg["content"])
 
-# --- Микрофон: маленькая кнопка по центру над полем ввода ---
-st.markdown(
-    "<div style='display:flex; justify-content:center; margin-bottom:-20px'>",
-    unsafe_allow_html=True,
-)
+# Микрофон
 _, col_mic, _ = st.columns([0.48, 0.04, 0.48])
 with col_mic:
     audio_bytes = audio_recorder(
         text="", recording_color="#e74c3c",
         neutral_color="#888888", icon_size="sm",
     )
-st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Голосовой ввод ---
+# Голосовой ввод
 if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.get("last_audio"):
     st.session_state.last_audio = audio_bytes
-    with st.spinner("Распознаю речь..."):
+    with st.spinner(t(lang, "recognizing")):
         voice_text = transcribe_audio(audio_bytes)
     if voice_text:
         with st.chat_message("user"):
             st.markdown(f"🎙️ {voice_text}")
         st.session_state.messages.append({"role": "user", "content": f"🎙️ {voice_text}"})
         with st.chat_message("assistant"):
-            with st.spinner("Тренер думает..."):
-                response = chain.invoke({
-                    "name": name, "age": age, "weight": weight, "height": height,
-                    "goal": goal, "level": level, "trainer_style": trainer_style,
-                    "history": st.session_state.history.messages,
-                    "input": voice_text,
-                })
+            with st.spinner(t(lang, "thinking")):
+                response = chain.invoke(get_chain_input(voice_text))
             st.markdown(response)
         if voice_response:
             speak(response)
@@ -200,9 +263,9 @@ if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.g
         save_message(name, "assistant", response)
         st.session_state.messages.append({"role": "assistant", "content": response})
 
-# --- Текст + фото/файл в одном поле ---
+# Текстовый ввод + файл
 msg = st.chat_input(
-    "Напиши тренеру или прикрепи фото/файл  📎",
+    t(lang, "chat_placeholder"),
     accept_file=True,
     file_type=["jpg", "jpeg", "png", "webp", "pdf", "csv"],
 )
@@ -224,175 +287,140 @@ if msg:
 
     st.session_state.messages.append({
         "role": "user",
-        "content": user_input or (f"📄 {attached.name}" if attached else "_(сообщение)_"),
+        "content": user_input or (f"📄 {attached.name}" if attached else "_(msg)_"),
     })
 
     with st.chat_message("assistant"):
-        with st.spinner("Тренер думает..."):
+        with st.spinner(t(lang, "thinking")):
             if is_image:
                 image_data = attached.read()
+                exercise_info = extract_exercise_from_image(image_data, attached.type)
                 response = analyze_with_image(image_data, attached.type, user_input)
+                if exercise_info.get("exercise"):
+                    st.session_state.detected_exercise = exercise_info
             elif is_doc:
                 file_text = extract_text_from_file(attached)
-                if attached.name.endswith(".pdf"):
-                    doc_prompt = f"Вот мои анализы или медицинский документ. Проанализируй и дай рекомендации по тренировкам и питанию:\n\n{file_text[:4000]}"
-                else:
-                    doc_prompt = f"Вот мои данные о питании из приложения. Проанализируй рацион и дай рекомендации:\n\n{file_text[:4000]}"
-                response = chain.invoke({
-                    "name": name, "age": age, "weight": weight, "height": height,
-                    "goal": goal, "level": level, "trainer_style": trainer_style,
-                    "history": st.session_state.history.messages,
-                    "input": doc_prompt,
-                })
+                doc_prompt = f"Here is my document ({attached.name}). Analyze it and give recommendations:\n\n{file_text[:4000]}"
+                response = chain.invoke(get_chain_input(doc_prompt))
             else:
-                response = chain.invoke({
-                    "name": name, "age": age, "weight": weight, "height": height,
-                    "goal": goal, "level": level, "trainer_style": trainer_style,
-                    "history": st.session_state.history.messages,
-                    "input": user_input,
-                })
+                response = chain.invoke(get_chain_input(user_input))
         st.markdown(response)
 
     if voice_response:
         speak(response)
-    st.session_state.history.add_user_message(user_input or "[файл]")
+    st.session_state.history.add_user_message(user_input or "[file]")
     st.session_state.history.add_ai_message(response)
-    save_message(name, "user", user_input or "[файл]")
+    save_message(name, "user", user_input or "[file]")
     save_message(name, "assistant", response)
     st.session_state.messages.append({"role": "assistant", "content": response})
 
-# ============================================================
-# ВКЛАДКА 2: ДНЕВНИК ТРЕНИРОВОК
-# ============================================================
-MUSCLE_GROUPS = [
-    "Грудь", "Спина", "Плечи", "Бицепс", "Трицепс",
-    "Пресс", "Квадрицепс", "Бицепс бедра", "Ягодицы", "Икры", "Кардио"
-]
+# Форма сохранения упражнения из фото
+if st.session_state.get("detected_exercise", {}).get("exercise"):
+    info = st.session_state.detected_exercise
+    with st.expander(t(lang, "save_to_diary"), expanded=True):
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            q_exercise = st.text_input(t(lang, "exercise"), value=info["exercise"], key="q_ex")
+        with col2:
+            mg = info["muscle_group"] if info["muscle_group"] in MUSCLE_GROUPS else MUSCLE_GROUPS[0]
+            q_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS,
+                                    index=MUSCLE_GROUPS.index(mg), key="q_mg")
+        with col3:
+            q_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20, value=3, key="q_sets")
+            q_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10, key="q_reps")
+        with col4:
+            q_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, value=0.0, step=2.5, key="q_weight")
+        col_save, col_skip = st.columns(2)
+        with col_save:
+            if st.button(t(lang, "btn_save"), use_container_width=True):
+                add_exercise(name, str(date.today()), q_exercise, q_muscle, q_sets, q_reps, q_weight)
+                st.success(f"{t(lang, 'recorded')}: {q_exercise}")
+                st.session_state.detected_exercise = {}
+                st.rerun()
+        with col_skip:
+            if st.button(t(lang, "btn_skip"), use_container_width=True):
+                st.session_state.detected_exercise = {}
+                st.rerun()
 
+# ============================================================
+# ВКЛАДКА 2: ДНЕВНИК
+# ============================================================
 with tab_diary:
-    st.subheader("Записать тренировку")
-
+    st.subheader(t(lang, "record_workout"))
     col1, col2 = st.columns(2)
     with col1:
-        w_date = st.date_input("Дата", value=date.today())
-        w_exercise = st.text_input("Упражнение", placeholder="Жим лёжа, Приседания...")
-        w_muscle = st.selectbox("Группа мышц", MUSCLE_GROUPS)
+        w_date = st.date_input(t(lang, "date"), value=date.today())
+        w_exercise = st.text_input(t(lang, "exercise"), placeholder=t(lang, "exercise_placeholder"))
+        w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS)
     with col2:
-        w_sets = st.number_input("Подходы", min_value=1, max_value=20, value=3)
-        w_reps = st.number_input("Повторения", min_value=1, max_value=100, value=10)
-        w_weight = st.number_input("Вес (кг)", min_value=0.0, max_value=500.0, value=0.0, step=2.5)
-
-    w_notes = st.text_input("Заметки (необязательно)", placeholder="Хорошо пошло, болело плечо...")
+        w_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20, value=3)
+        w_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10)
+        w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0, value=0.0, step=2.5)
+    w_notes = st.text_input(t(lang, "notes"), placeholder=t(lang, "notes_placeholder"))
 
     col_add, col_del = st.columns([0.3, 0.7])
     with col_add:
-        if st.button("➕ Добавить", use_container_width=True):
+        if st.button(t(lang, "add_exercise"), use_container_width=True):
             if w_exercise:
-                add_exercise(name, str(w_date), w_exercise, w_muscle,
-                             w_sets, w_reps, w_weight, w_notes)
-                st.success(f"Записано: {w_exercise}")
+                add_exercise(name, str(w_date), w_exercise, w_muscle, w_sets, w_reps, w_weight, w_notes)
+                st.success(f"{t(lang, 'recorded')}: {w_exercise}")
                 st.rerun()
             else:
-                st.warning("Введи название упражнения")
+                st.warning(t(lang, "enter_exercise"))
     with col_del:
-        if st.button("↩️ Удалить последнюю запись", use_container_width=True):
+        if st.button(t(lang, "delete_last"), use_container_width=True):
             delete_last_exercise(name)
             st.rerun()
 
     st.divider()
-    st.subheader("История тренировок")
+    st.subheader(t(lang, "workout_history"))
     workouts = get_workouts(name, limit=50)
     if workouts:
         df = pd.DataFrame(workouts)
-        df.columns = ["Дата", "Упражнение", "Группа мышц", "Подходы", "Повторения", "Вес (кг)", "Заметки"]
+        df.columns = t(lang, "table_cols")
         st.dataframe(df, use_container_width=True, hide_index=True)
     else:
-        st.info("Тренировок ещё нет. Добавь первую!")
+        st.info(t(lang, "no_workouts"))
 
 # ============================================================
-# ВКЛАДКА 3: АНАЛИЗ ПРОГРЕССА
+# ВКЛАДКА 3: АНАЛИЗ
 # ============================================================
 with tab_analysis:
-    st.subheader("Анализ тренировок с тренером")
-
+    st.subheader(t(lang, "analysis_title"))
     workouts_text = get_workouts_as_text(name, limit=50)
     muscle_summary = get_muscle_summary(name)
 
-    # Быстрая сводка
-    st.markdown("**Сводка по группам мышц:**")
+    st.markdown(f"**{t(lang, 'muscle_summary')}**")
     st.code(muscle_summary)
-
     st.divider()
 
-    # Кнопки быстрого анализа
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        analyze_all = st.button("🔍 Полный анализ прогресса", use_container_width=True)
+        analyze_all = st.button(t(lang, "btn_full_analysis"), use_container_width=True)
     with col_b:
-        analyze_weak = st.button("⚠️ Слабые места", use_container_width=True)
+        analyze_weak = st.button(t(lang, "btn_weak"), use_container_width=True)
     with col_c:
-        analyze_plan = st.button("📋 Новый план на основе данных", use_container_width=True)
+        analyze_plan = st.button(t(lang, "btn_plan"), use_container_width=True)
 
-    # Выбор конкретной группы мышц
     st.divider()
-    selected_muscle = st.selectbox("Анализ конкретной группы мышц:", ["— Выбери —"] + MUSCLE_GROUPS)
-    analyze_muscle = st.button("🎯 Анализировать эту группу", use_container_width=False)
+    selected_muscle = st.selectbox(t(lang, "select_muscle"),
+                                   [t(lang, "select_placeholder")] + MUSCLE_GROUPS)
+    analyze_muscle = st.button(t(lang, "btn_analyze_muscle"))
 
-    # Выполняем анализ
     analysis_prompt = None
-
     if analyze_all:
-        analysis_prompt = f"""Вот мой дневник тренировок:
-
-{workouts_text}
-
-Сделай полный анализ:
-1. Есть ли прогресс (рост весов/объёма)?
-2. Какие мышцы проработаны хорошо, какие отстают?
-3. Есть ли дисбаланс между мышечными группами?
-4. Риски травм?
-5. Конкретные рекомендации для улучшения."""
-
+        analysis_prompt = f"Here is my workout diary:\n\n{workouts_text}\n\nDo a full analysis: progress, muscle balance, injury risks, recommendations."
     elif analyze_weak:
-        analysis_prompt = f"""Вот мой дневник тренировок:
-
-{workouts_text}
-
-Определи мои слабые места:
-- Какие мышцы тренируются редко или с малым весом?
-- Где нет прогресса?
-- Что нужно усилить исходя из моей цели: {goal}?"""
-
+        analysis_prompt = f"Here is my workout diary:\n\n{workouts_text}\n\nIdentify my weak spots. My goal: {goal}."
     elif analyze_plan:
-        analysis_prompt = f"""Вот мой дневник тренировок за последнее время:
-
-{workouts_text}
-
-На основе этих данных составь новый оптимальный план тренировок на следующие 2 недели.
-Учти мою цель: {goal}, уровень: {level}.
-Укажи конкретные упражнения, подходы, повторения и рекомендуемый вес."""
-
-    elif analyze_muscle and selected_muscle != "— Выбери —":
-        analysis_prompt = f"""Вот мой дневник тренировок:
-
-{workouts_text}
-
-Сделай детальный анализ группы мышц: **{selected_muscle}**
-1. Сколько раз тренировалась эта группа?
-2. Есть ли прогресс в весах и объёме?
-3. Достаточно ли нагрузки для моей цели ({goal})?
-4. Какие упражнения добавить или улучшить?
-5. Мотивирующее заключение."""
+        analysis_prompt = f"Here is my workout diary:\n\n{workouts_text}\n\nBased on this, create a new 2-week training plan. Goal: {goal}, level: {level}."
+    elif analyze_muscle and selected_muscle != t(lang, "select_placeholder"):
+        analysis_prompt = f"Here is my workout diary:\n\n{workouts_text}\n\nDo a detailed analysis of muscle group: {selected_muscle}. Goal: {goal}."
 
     if analysis_prompt:
         with st.chat_message("assistant"):
-            with st.spinner("Тренер анализирует твои тренировки..."):
-                response = chain.invoke({
-                    "name": name, "age": age, "weight": weight, "height": height,
-                    "goal": goal, "level": level, "trainer_style": trainer_style,
-                    "history": [],
-                    "input": analysis_prompt,
-                })
+            with st.spinner(t(lang, "analyzing")):
+                response = chain.invoke(get_chain_input(analysis_prompt))
             st.markdown(response)
         if voice_response:
             speak(response)

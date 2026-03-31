@@ -41,3 +41,34 @@ def clear_history(user_name: str):
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("DELETE FROM messages WHERE user_name = ?", (user_name,))
+
+
+def save_language(user_name: str, lang_name: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_prefs (
+                user_name TEXT PRIMARY KEY,
+                language TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            INSERT INTO user_prefs (user_name, language) VALUES (?, ?)
+            ON CONFLICT(user_name) DO UPDATE SET language = excluded.language
+        """, (user_name, lang_name))
+
+
+def load_language(user_name: str, default: str = "Русский") -> str:
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS user_prefs (
+                    user_name TEXT PRIMARY KEY,
+                    language TEXT NOT NULL
+                )
+            """)
+            row = conn.execute(
+                "SELECT language FROM user_prefs WHERE user_name = ?", (user_name,)
+            ).fetchone()
+        return row[0] if row else default
+    except Exception:
+        return default
