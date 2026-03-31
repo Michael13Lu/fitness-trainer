@@ -344,6 +344,23 @@ if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.g
         save_message(name, "assistant", response)
         st.session_state.messages.append({"role": "assistant", "content": response})
 
+# Загрузка фото отдельно (лучше работает на мобильных)
+with st.expander("📷 " + t(lang, "attach_photo"), expanded=False):
+    mobile_upload = st.file_uploader(
+        t(lang, "attach_photo"),
+        type=["jpg", "jpeg", "png", "webp"],
+        label_visibility="collapsed",
+        key="mobile_upload",
+    )
+    mobile_text = st.text_input(t(lang, "chat_placeholder"), key="mobile_text", label_visibility="collapsed")
+    if st.button(t(lang, "send_photo"), key="mobile_send", disabled=mobile_upload is None):
+        if "pending_upload" not in st.session_state:
+            st.session_state.pending_upload = {"file": mobile_upload, "text": mobile_text}
+            st.rerun()
+
+# Извлекаем pending upload если есть
+_pending = st.session_state.pop("pending_upload", None)
+
 # Текстовый ввод + файл
 msg = st.chat_input(
     t(lang, "chat_placeholder"),
@@ -351,9 +368,13 @@ msg = st.chat_input(
     file_type=["jpg", "jpeg", "png", "webp", "pdf", "csv"],
 )
 
-if msg:
-    user_input = msg.text or ""
-    attached = msg["files"][0] if msg["files"] else None
+if msg or _pending:
+    if _pending:
+        user_input = _pending["text"] or ""
+        attached = _pending["file"]
+    else:
+        user_input = msg.text or ""
+        attached = msg["files"][0] if msg["files"] else None
     is_image = attached and attached.type in ("image/jpeg", "image/png", "image/webp", "image/jpg")
     is_doc = attached and not is_image
 
