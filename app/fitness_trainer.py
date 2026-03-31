@@ -79,7 +79,7 @@ _prof = st.session_state.setdefault("profile", {
 with st.sidebar:
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("👤 " + t(lang, "profile"), use_container_width=True):
+        if st.button("🙂 " + t(lang, "profile"), use_container_width=True):
             st.session_state.sidebar_section = "profile"
     with c2:
         if st.button("🔊", use_container_width=True):

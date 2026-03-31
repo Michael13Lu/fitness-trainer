@@ -12,7 +12,7 @@ T = {
         # Заголовок
         "app_title": "💪 Персональный фитнес-тренер",
         # Сайдбар
-        "profile": "👤 Твой профиль",
+        "profile": "Профиль",
         "name": "Имя",
         "age": "Возраст",
         "weight": "Вес (кг)",
@@ -73,7 +73,7 @@ T = {
     },
     "en": {
         "app_title": "💪 Personal Fitness Trainer",
-        "profile": "👤 Your Profile",
+        "profile": "Profile",
         "name": "Name",
         "age": "Age",
         "weight": "Weight (kg)",
@@ -128,7 +128,7 @@ T = {
     },
     "es": {
         "app_title": "💪 Entrenador Personal",
-        "profile": "👤 Tu perfil",
+        "profile": "Perfil",
         "name": "Nombre",
         "age": "Edad",
         "weight": "Peso (kg)",
@@ -183,7 +183,7 @@ T = {
     },
     "de": {
         "app_title": "💪 Persönlicher Fitnesstrainer",
-        "profile": "👤 Dein Profil",
+        "profile": "Profil",
         "name": "Name",
         "age": "Alter",
         "weight": "Gewicht (kg)",
@@ -238,7 +238,7 @@ T = {
     },
     "fr": {
         "app_title": "💪 Coach Fitness Personnel",
-        "profile": "👤 Ton profil",
+        "profile": "Profil",
         "name": "Prénom",
         "age": "Âge",
         "weight": "Poids (kg)",
@@ -293,7 +293,7 @@ T = {
     },
     "he": {
         "app_title": "💪 מאמן כושר אישי",
-        "profile": "👤 הפרופיל שלך",
+        "profile": "פרופיל",
         "name": "שם",
         "age": "גיל",
         "weight": "משקל (ק\"ג)",
