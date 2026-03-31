@@ -19,6 +19,8 @@ from memory_store import load_messages, save_message, clear_history, save_langua
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise,
                            get_workouts_by_date)
+from food_store import (add_food, get_food_by_date, get_food_history,
+                        delete_last_food, get_daily_totals, get_food_as_text)
 from translations import LANGUAGES, t
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
@@ -381,8 +383,8 @@ If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}
 # ============================================================
 # ВКЛАДКИ
 # ============================================================
-tab_chat, tab_diary, tab_analysis = st.tabs([
-    t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_analysis")
+tab_chat, tab_diary, tab_food, tab_analysis = st.tabs([
+    t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"), t(lang, "tab_analysis")
 ])
 
 # ============================================================
@@ -580,6 +582,48 @@ with tab_diary:
             delete_last_exercise(name)
             st.rerun()
 
+    # Голосовой ввод упражнения
+    st.caption(t(lang, "voice_add_exercise"))
+    _, _mic_col, _ = st.columns([0.45, 0.1, 0.45])
+    with _mic_col:
+        _diary_audio = audio_recorder(
+            text="", recording_color="#e74c3c", neutral_color="#888888",
+            icon_size="sm", key="diary_mic",
+        )
+    if _diary_audio and len(_diary_audio) > 1000 and _diary_audio != st.session_state.get("last_diary_audio"):
+        st.session_state.last_diary_audio = _diary_audio
+        with st.spinner(t(lang, "recognizing")):
+            _diary_voice = transcribe_audio(_diary_audio)
+        if _diary_voice:
+            st.info(f"🎙️ {_diary_voice}")
+            with st.spinner(t(lang, "thinking")):
+                _parse_prompt = (
+                    f"Extract workout entry from: '{_diary_voice}'. "
+                    f"Return JSON: {{\"exercise\": \"\", \"muscle_group\": \"\", "
+                    f"\"sets\": 0, \"reps\": 0, \"weight\": 0, \"notes\": \"\"}}. "
+                    f"muscle_group must be one of: {MUSCLE_GROUPS}. "
+                    f"Return only valid JSON, no explanation."
+                )
+                _parsed_raw = llm_text.invoke(_parse_prompt).content.strip()
+            try:
+                import re as _re
+                _json_match = _re.search(r'\{.*\}', _parsed_raw, _re.DOTALL)
+                if _json_match:
+                    import json as _json
+                    _p = _json.loads(_json_match.group())
+                    if _p.get("exercise"):
+                        add_exercise(name, str(w_date),
+                                     _p["exercise"],
+                                     _p.get("muscle_group", MUSCLE_GROUPS[0]),
+                                     int(_p.get("sets", 3)),
+                                     int(_p.get("reps", 10)),
+                                     float(_p.get("weight", 0)),
+                                     _p.get("notes", ""))
+                        st.success(f"{t(lang, 'recorded')}: {_p['exercise']}")
+                        st.rerun()
+            except Exception:
+                st.warning(f"Не смог распознать: {_diary_voice}")
+
     # Сохранить тренировку в Google Calendar
     if st.session_state.gcal_creds:
         today_exercises = get_workouts_by_date(name, str(w_date))
@@ -658,7 +702,162 @@ with tab_diary:
         st.info(t(lang, "no_workouts"))
 
 # ============================================================
-# ВКЛАДКА 3: АНАЛИЗ
+# ВКЛАДКА 3: ПИТАНИЕ
+# ============================================================
+with tab_food:
+    st.subheader(t(lang, "food_title"))
+
+    f_date = st.date_input(t(lang, "date"), value=date.today(), key="f_date")
+
+    # --- Форма добавления ---
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        f_meal = st.selectbox(t(lang, "meal_type"), t(lang, "meal_types"), key="f_meal")
+        f_name = st.text_input(t(lang, "food_name"), placeholder=t(lang, "food_placeholder"), key="f_name")
+        f_weight = st.number_input(t(lang, "food_weight"), min_value=0.0, max_value=5000.0, value=100.0, step=10.0, key="f_weight")
+    with col_f2:
+        f_cal = st.number_input(t(lang, "calories"), min_value=0.0, max_value=5000.0, value=0.0, step=1.0, key="f_cal")
+        f_prot = st.number_input(t(lang, "protein"), min_value=0.0, max_value=500.0, value=0.0, step=0.5, key="f_prot")
+        f_fat = st.number_input(t(lang, "fat"), min_value=0.0, max_value=500.0, value=0.0, step=0.5, key="f_fat")
+        f_carb = st.number_input(t(lang, "carbs"), min_value=0.0, max_value=500.0, value=0.0, step=0.5, key="f_carb")
+
+    col_fadd, col_fdel = st.columns([0.3, 0.7])
+    with col_fadd:
+        if st.button(t(lang, "add_food"), use_container_width=True):
+            if f_name:
+                add_food(name, str(f_date), f_meal, f_name,
+                         f_cal, f_prot, f_fat, f_carb, f_weight)
+                st.success(f"{t(lang, 'recorded')}: {f_name}")
+                st.rerun()
+            else:
+                st.warning(t(lang, "enter_exercise"))
+    with col_fdel:
+        if st.button(t(lang, "delete_last_food"), use_container_width=True):
+            delete_last_food(name)
+            st.rerun()
+
+    # Голосовой ввод еды
+    st.caption(t(lang, "voice_add_food"))
+    _, _fmic_col, _ = st.columns([0.45, 0.1, 0.45])
+    with _fmic_col:
+        _food_audio = audio_recorder(
+            text="", recording_color="#27ae60", neutral_color="#888888",
+            icon_size="sm", key="food_mic",
+        )
+    if _food_audio and len(_food_audio) > 1000 and _food_audio != st.session_state.get("last_food_audio"):
+        st.session_state.last_food_audio = _food_audio
+        with st.spinner(t(lang, "recognizing")):
+            _food_voice = transcribe_audio(_food_audio)
+        if _food_voice:
+            st.info(f"🎙️ {_food_voice}")
+            with st.spinner(t(lang, "thinking")):
+                _food_parse_prompt = (
+                    f"Extract food entry from: '{_food_voice}'. "
+                    f"Return JSON: {{\"food_name\": \"\", \"meal_type\": \"\", "
+                    f"\"weight_g\": 0, \"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0}}. "
+                    f"meal_type must be one of: {t(lang, 'meal_types')}. "
+                    f"If calories/macros not mentioned, estimate based on the food and weight. "
+                    f"Return only valid JSON, no explanation."
+                )
+                _food_raw = llm_text.invoke(_food_parse_prompt).content.strip()
+            try:
+                import re as _re2
+                import json as _json2
+                _fm = _re2.search(r'\{.*\}', _food_raw, _re2.DOTALL)
+                if _fm:
+                    _fp = _json2.loads(_fm.group())
+                    if _fp.get("food_name"):
+                        add_food(name, str(f_date),
+                                 _fp.get("meal_type", f_meal),
+                                 _fp["food_name"],
+                                 float(_fp.get("calories", 0)),
+                                 float(_fp.get("protein", 0)),
+                                 float(_fp.get("fat", 0)),
+                                 float(_fp.get("carbs", 0)),
+                                 float(_fp.get("weight_g", 0)))
+                        st.success(f"{t(lang, 'recorded')}: {_fp['food_name']}")
+                        st.rerun()
+            except Exception:
+                st.warning(f"Не смог распознать: {_food_voice}")
+
+    # Добавление по фото
+    with st.expander("📷 " + t(lang, "food_name") + " по фото", expanded=False):
+        food_photo = st.file_uploader(
+            "photo", type=["jpg", "jpeg", "png", "webp"],
+            label_visibility="collapsed", key="food_photo"
+        )
+        food_photo_meal = st.selectbox(t(lang, "meal_type"), t(lang, "meal_types"), key="fphoto_meal")
+        if food_photo and st.button(t(lang, "analyzing_food"), key="analyze_food_photo"):
+            with st.spinner(t(lang, "analyzing_food")):
+                import base64 as _b64
+                _img_bytes = food_photo.read()
+                _b64_img = _b64.b64encode(_img_bytes).decode()
+                _photo_prompt = (
+                    "Analyze this food photo. Return JSON: "
+                    "{\"food_name\": \"\", \"weight_g\": 0, \"calories\": 0, "
+                    "\"protein\": 0, \"fat\": 0, \"carbs\": 0}. "
+                    "Estimate portions from the photo. Return only valid JSON."
+                )
+                from langchain_core.messages import HumanMessage as _HM
+                _photo_resp = llm_vision.invoke([_HM(content=[
+                    {"type": "image_url", "image_url": {"url": f"data:{food_photo.type};base64,{_b64_img}"}},
+                    {"type": "text", "text": _photo_prompt},
+                ])]).content.strip()
+            try:
+                import re as _re3
+                import json as _json3
+                _pm = _re3.search(r'\{.*\}', _photo_resp, _re3.DOTALL)
+                if _pm:
+                    _pp = _json3.loads(_pm.group())
+                    if _pp.get("food_name"):
+                        add_food(name, str(f_date), food_photo_meal,
+                                 _pp["food_name"],
+                                 float(_pp.get("calories", 0)),
+                                 float(_pp.get("protein", 0)),
+                                 float(_pp.get("fat", 0)),
+                                 float(_pp.get("carbs", 0)),
+                                 float(_pp.get("weight_g", 0)))
+                        st.success(f"{t(lang, 'recorded')}: {_pp['food_name']} — {_pp.get('calories', 0):.0f} ккал")
+                        st.rerun()
+            except Exception:
+                st.error("Не удалось распознать блюдо на фото")
+
+    # Дневные итоги
+    st.divider()
+    _totals = get_daily_totals(name, str(f_date))
+    if _totals["calories"] > 0:
+        st.markdown(f"**{t(lang, 'daily_total')}:**")
+        _tc1, _tc2, _tc3, _tc4 = st.columns(4)
+        _tc1.metric("🔥 " + t(lang, "calories"), f"{_totals['calories']:.0f}")
+        _tc2.metric("🥩 " + t(lang, "protein"), f"{_totals['protein']:.0f}г")
+        _tc3.metric("🧈 " + t(lang, "fat"), f"{_totals['fat']:.0f}г")
+        _tc4.metric("🍞 " + t(lang, "carbs"), f"{_totals['carbs']:.0f}г")
+
+    # История питания за день
+    st.subheader(t(lang, "food_history"))
+    _day_food = get_food_by_date(name, str(f_date))
+    if _day_food:
+        for _entry in _day_food:
+            _details = f"{_entry['food_name']}"
+            if _entry["weight_g"]:
+                _details += f" {_entry['weight_g']:.0f}г"
+            _macro = []
+            if _entry["calories"]:
+                _macro.append(f"🔥{_entry['calories']:.0f}")
+            if _entry["protein"]:
+                _macro.append(f"Б{_entry['protein']:.0f}")
+            if _entry["fat"]:
+                _macro.append(f"Ж{_entry['fat']:.0f}")
+            if _entry["carbs"]:
+                _macro.append(f"У{_entry['carbs']:.0f}")
+            if _macro:
+                _details += "  " + " ".join(_macro)
+            st.markdown(f"**{_entry['meal_type']}** — {_details}")
+    else:
+        st.info(t(lang, "no_food"))
+
+# ============================================================
+# ВКЛАДКА 4: АНАЛИЗ
 # ============================================================
 with tab_analysis:
     st.subheader(t(lang, "analysis_title"))
