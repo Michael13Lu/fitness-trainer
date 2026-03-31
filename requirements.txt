@@ -7,3 +7,5 @@ streamlit
 python-dotenv
 audio-recorder-streamlit
 groq
+pypdf
+pandas
