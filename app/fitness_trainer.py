@@ -21,6 +21,9 @@ from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_by_date)
 from food_store import (add_food, get_food_by_date, get_food_history,
                         delete_last_food, get_daily_totals, get_food_as_text)
+import importlib
+import translations as _translations_mod
+importlib.reload(_translations_mod)
 from translations import LANGUAGES, t
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
