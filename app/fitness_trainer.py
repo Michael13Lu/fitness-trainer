@@ -15,7 +15,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_community.chat_message_histories import ChatMessageHistory
 from audio_recorder_streamlit import audio_recorder
 from groq import Groq
-from memory_store import load_messages, save_message, clear_history, save_language, load_language
+from memory_store import load_messages, save_message, clear_history, save_language, load_language, save_profile, load_profile
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise,
                            get_workouts_by_date)
@@ -71,11 +71,21 @@ st.title(t(lang, "app_title"))
 if "sidebar_section" not in st.session_state:
     st.session_state.sidebar_section = "profile"
 
-# Сохраняем профиль в session_state чтобы не терять при переключении разделов
-_prof = st.session_state.setdefault("profile", {
+_PROFILE_DEFAULTS = {
     "name": "Михаил", "age": 25, "weight": 75, "height": 175,
     "goal_idx": 0, "level_idx": 0, "style_idx": 0,
-})
+    "target_weight": 0.0, "target_date": "",
+}
+
+if "profile" not in st.session_state:
+    # Попытка загрузить из БД по имени по умолчанию
+    _saved = load_profile(_PROFILE_DEFAULTS["name"])
+    st.session_state["profile"] = _saved if _saved else dict(_PROFILE_DEFAULTS)
+
+_prof = st.session_state["profile"]
+# Заполняем недостающие ключи (обратная совместимость)
+for _k, _v in _PROFILE_DEFAULTS.items():
+    _prof.setdefault(_k, _v)
 
 with st.sidebar:
     c1, c2, c3 = st.columns(3)
@@ -107,6 +117,22 @@ with st.sidebar:
         styles_list = t(lang, "styles")
         _prof["style_idx"] = min(_prof["style_idx"], len(styles_list) - 1)
         _prof["style_idx"] = styles_list.index(st.selectbox(t(lang, "trainer_style"), styles_list, index=_prof["style_idx"]))
+
+        st.divider()
+        _prof["target_weight"] = st.number_input(
+            t(lang, "target_weight"), min_value=0.0, max_value=300.0,
+            value=float(_prof["target_weight"]), step=0.5,
+            help="0 = не задано"
+        )
+        import datetime as _dt
+        _default_date = (
+            _dt.date.fromisoformat(_prof["target_date"])
+            if _prof.get("target_date") else _dt.date.today() + _dt.timedelta(weeks=12)
+        )
+        _target_date = st.date_input(t(lang, "target_date"), value=_default_date)
+        _prof["target_date"] = str(_target_date)
+
+        save_profile(_prof["name"], _prof)
 
     # ── Голос и чат ──────────────────────────────────────────
     elif st.session_state.sidebar_section == "voice":
@@ -140,6 +166,36 @@ height = _prof["height"]
 goal = t(lang, "goals")[_prof["goal_idx"]]
 level = t(lang, "levels")[_prof["level_idx"]]
 trainer_style = t(lang, "styles")[_prof["style_idx"]]
+target_weight = _prof.get("target_weight", 0.0)
+target_date = _prof.get("target_date", "")
+
+# Вычисляем реалистичный темп похудения
+import datetime as _dt
+_weight_goal_info = ""
+if target_weight and target_weight > 0 and target_date:
+    _kg_diff = weight - target_weight
+    try:
+        _days = (_dt.date.fromisoformat(target_date) - _dt.date.today()).days
+        _weeks = max(_days / 7, 1)
+        _kg_per_week = _kg_diff / _weeks
+        _realistic = 0.5 if _kg_diff > 0 else 0.3  # норма похудения/набора в кг/нед
+        _realistic_weeks = abs(_kg_diff) / _realistic
+        _realistic_date = _dt.date.today() + _dt.timedelta(weeks=_realistic_weeks)
+        if _kg_diff > 0:
+            _weight_goal_info = (
+                f"- Target weight: {target_weight} kg by {target_date} "
+                f"({_kg_diff:+.1f} kg, {_kg_per_week:.2f} kg/week planned). "
+                f"Safe rate is ~0.5 kg/week → realistic date: {_realistic_date}. "
+                f"{'WARN: plan is too aggressive, adjust expectations.' if abs(_kg_per_week) > 1.0 else 'Plan is realistic.'}"
+            )
+        elif _kg_diff < 0:
+            _weight_goal_info = (
+                f"- Target weight: {target_weight} kg by {target_date} "
+                f"(+{abs(_kg_diff):.1f} kg muscle gain). "
+                f"Safe rate ~0.3 kg/week → realistic date: {_realistic_date}."
+            )
+    except Exception:
+        _weight_goal_info = f"- Target weight: {target_weight} kg by {target_date}"
 if st.session_state.sidebar_section != "voice":
     voice_response = False
 
@@ -159,12 +215,15 @@ if "messages" not in st.session_state:
 
 if "loaded_for" not in st.session_state:
     st.session_state.loaded_for = name
-    # Загружаем язык из БД при первом запуске
     saved_lang = load_language(name)
     if saved_lang != st.session_state.lang_name:
         st.session_state.lang_name = saved_lang
         st.rerun()
 elif st.session_state.loaded_for != name:
+    # Смена пользователя — загружаем его профиль и историю
+    _saved_prof = load_profile(name)
+    if _saved_prof:
+        st.session_state["profile"] = _saved_prof
     st.session_state.history = ChatMessageHistory()
     for msg in load_messages(name):
         if msg["role"] == "user":
@@ -173,7 +232,6 @@ elif st.session_state.loaded_for != name:
             st.session_state.history.add_ai_message(msg["content"])
     st.session_state.messages = load_messages(name)
     st.session_state.loaded_for = name
-    # Загружаем язык нового пользователя
     saved_lang = load_language(name)
     if saved_lang != st.session_state.lang_name:
         st.session_state.lang_name = saved_lang
@@ -198,8 +256,10 @@ Client info:
 - Goal: {goal}
 - Fitness level: {level}
 - Your communication style: {trainer_style}
-
+{weight_goal_info}
 Give specific advice on training and nutrition based on the client's profile.
+When building a program, respect the realistic weight loss/gain rate (~0.5 kg/week for fat loss).
+If the client's target is too aggressive, gently explain realistic expectations.
 Motivate and support. Be concrete and practical.
 {lang_instruction}"""
 
@@ -217,6 +277,7 @@ def get_chain_input(user_input: str) -> dict:
     return {
         "name": name, "age": age, "weight": weight, "height": height,
         "goal": goal, "level": level, "trainer_style": trainer_style,
+        "weight_goal_info": _weight_goal_info,
         "lang_instruction": t(lang, "system_prompt_lang"),
         "history": st.session_state.history.messages,
         "input": user_input,
@@ -235,6 +296,7 @@ def get_system_text():
     return system_prompt.format(
         name=name, age=age, weight=weight, height=height,
         goal=goal, level=level, trainer_style=trainer_style,
+        weight_goal_info=_weight_goal_info,
         lang_instruction=t(lang, "system_prompt_lang")
     )
 

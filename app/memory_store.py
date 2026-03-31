@@ -43,6 +43,42 @@ def clear_history(user_name: str):
         conn.execute("DELETE FROM messages WHERE user_name = ?", (user_name,))
 
 
+def save_profile(user_name: str, profile: dict):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_prefs (
+                user_name TEXT PRIMARY KEY,
+                language TEXT NOT NULL DEFAULT 'Русский',
+                profile TEXT
+            )
+        """)
+        try:
+            conn.execute("ALTER TABLE user_prefs ADD COLUMN profile TEXT")
+        except sqlite3.OperationalError:
+            pass
+        conn.execute("""
+            INSERT INTO user_prefs (user_name, language, profile) VALUES (?, '', ?)
+            ON CONFLICT(user_name) DO UPDATE SET profile = excluded.profile
+        """, (user_name, json.dumps(profile, ensure_ascii=False)))
+
+
+def load_profile(user_name: str) -> dict | None:
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            try:
+                conn.execute("ALTER TABLE user_prefs ADD COLUMN profile TEXT")
+            except sqlite3.OperationalError:
+                pass
+            row = conn.execute(
+                "SELECT profile FROM user_prefs WHERE user_name = ?", (user_name,)
+            ).fetchone()
+        if row and row[0]:
+            return json.loads(row[0])
+    except Exception:
+        pass
+    return None
+
+
 def save_language(user_name: str, lang_name: str):
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
