@@ -192,6 +192,20 @@ trainer_style = t(lang, "styles")[_prof["style_idx"]]
 target_weight = _prof.get("target_weight", 0.0)
 target_date = _prof.get("target_date", "")
 
+# Дневная норма калорий (Mifflin-St Jeor + коэффициент активности)
+def _calc_tdee(weight_kg: float, height_cm: float, age_yr: int,
+               goal_idx: int, level_idx: int) -> int:
+    # BMR (для мужчин; небольшая погрешность без пола — добавим позже)
+    bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age_yr + 5
+    # Коэффициент по уровню подготовки: Новичок=1.375, Средний=1.55, Продвинутый=1.725
+    activity = [1.375, 1.55, 1.725][min(level_idx, 2)]
+    tdee = bmr * activity
+    # Корректировка по цели: похудеть=-300, поддержание=0, масса=+300, выносливость=-100
+    adj = [-300, 300, 0, -100][min(goal_idx, 3)]
+    return int(tdee + adj)
+
+DAILY_KCAL = _calc_tdee(weight, height, age, _prof["goal_idx"], _prof["level_idx"])
+
 # Вычисляем реалистичный темп похудения
 import datetime as _dt
 _weight_goal_info = ""
@@ -828,13 +842,24 @@ with tab_food:
     # Дневные итоги
     st.divider()
     _totals = get_daily_totals(name, str(f_date))
-    if _totals["calories"] > 0:
-        st.markdown(f"**{t(lang, 'daily_total')}:**")
-        _tc1, _tc2, _tc3, _tc4 = st.columns(4)
-        _tc1.metric("🔥 " + t(lang, "calories"), f"{_totals['calories']:.0f}")
-        _tc2.metric("🥩 " + t(lang, "protein"), f"{_totals['protein']:.0f}г")
-        _tc3.metric("🧈 " + t(lang, "fat"), f"{_totals['fat']:.0f}г")
-        _tc4.metric("🍞 " + t(lang, "carbs"), f"{_totals['carbs']:.0f}г")
+    _eaten = _totals["calories"]
+    _remaining = DAILY_KCAL - _eaten
+    _pct = min(int(_eaten / DAILY_KCAL * 100), 100) if DAILY_KCAL > 0 else 0
+
+    st.markdown(f"**{t(lang, 'daily_total')}:** {_eaten:.0f} / {DAILY_KCAL} ккал")
+    st.progress(_pct)
+
+    _tc1, _tc2, _tc3, _tc4 = st.columns(4)
+    _delta_color = "inverse" if _remaining < 0 else "normal"
+    _tc1.metric(
+        "🔥 " + t(lang, "calories"),
+        f"{_eaten:.0f}",
+        delta=f"{_remaining:+.0f} ккал",
+        delta_color=_delta_color,
+    )
+    _tc2.metric("🥩 " + t(lang, "protein"), f"{_totals['protein']:.0f}г")
+    _tc3.metric("🧈 " + t(lang, "fat"), f"{_totals['fat']:.0f}г")
+    _tc4.metric("🍞 " + t(lang, "carbs"), f"{_totals['carbs']:.0f}г")
 
     # История питания за день
     st.subheader(t(lang, "food_history"))
