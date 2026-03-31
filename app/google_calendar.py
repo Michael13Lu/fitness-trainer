@@ -33,14 +33,15 @@ def is_configured() -> bool:
     return bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
 
 
-def get_auth_url() -> str:
+def get_auth_url() -> tuple:
+    """Returns (auth_url, flow) — store the flow in session_state for exchange_code."""
     flow = Flow.from_client_config(_client_config(), scopes=SCOPES, redirect_uri=_redirect_uri())
     auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
-    return auth_url
+    return auth_url, flow
 
 
-def exchange_code(code: str) -> Credentials:
-    flow = Flow.from_client_config(_client_config(), scopes=SCOPES, redirect_uri=_redirect_uri())
+def exchange_code(flow, code: str) -> Credentials:
+    """Pass the same flow object returned by get_auth_url."""
     flow.fetch_token(code=code)
     return flow.credentials
 

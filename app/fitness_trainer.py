@@ -31,12 +31,16 @@ st.set_page_config(page_title="Fitness Trainer", page_icon="💪", layout="wide"
 # ============================================================
 if "gcal_creds" not in st.session_state:
     st.session_state.gcal_creds = None
+if "gcal_flow" not in st.session_state:
+    st.session_state.gcal_flow = None
 
 _params = st.query_params
 if "code" in _params and st.session_state.gcal_creds is None:
     try:
-        creds = exchange_code(_params["code"])
+        flow = st.session_state.gcal_flow
+        creds = exchange_code(flow, _params["code"])
         st.session_state.gcal_creds = creds_to_dict(creds)
+        st.session_state.gcal_flow = None
         st.query_params.clear()
         st.success("✅ Google Calendar connected!")
         st.rerun()
@@ -90,7 +94,8 @@ with st.sidebar:
             st.session_state.gcal_creds = None
             st.rerun()
     elif is_configured():
-        auth_url = get_auth_url()
+        auth_url, flow = get_auth_url()
+        st.session_state.gcal_flow = flow
         st.link_button("🔗 Connect Google Calendar", auth_url)
     else:
         st.caption("Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable")
