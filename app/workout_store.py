@@ -21,30 +21,49 @@ def init_workout_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Кардио-поля — добавляем если ещё нет
+        for col, typedef in [
+            ("cardio_type", "TEXT"),
+            ("duration_min", "INTEGER"),
+            ("distance_km", "REAL"),
+            ("avg_hr", "INTEGER"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE workouts ADD COLUMN {col} {typedef}")
+            except sqlite3.OperationalError:
+                pass  # уже существует
 
 
 def add_exercise(user_name: str, workout_date: str, exercise: str,
-                 muscle_group: str, sets: int, reps: int, weight_kg: float, notes: str = ""):
+                 muscle_group: str, sets: int = 0, reps: int = 0, weight_kg: float = 0.0,
+                 notes: str = "", cardio_type: str = "", duration_min: int = 0,
+                 distance_km: float = 0.0, avg_hr: int = 0):
     init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
-            INSERT INTO workouts (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg, notes))
+            INSERT INTO workouts
+              (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg,
+               notes, cardio_type, duration_min, distance_km, avg_hr)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg,
+              notes, cardio_type, duration_min, distance_km, avg_hr))
 
 
 def get_workouts(user_name: str, limit: int = 100) -> list:
     init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
-            SELECT workout_date, exercise, muscle_group, sets, reps, weight_kg, notes
+            SELECT workout_date, exercise, muscle_group, sets, reps, weight_kg, notes,
+                   cardio_type, duration_min, distance_km, avg_hr
             FROM workouts WHERE user_name = ?
             ORDER BY workout_date DESC, id DESC
             LIMIT ?
         """, (user_name, limit)).fetchall()
     return [
         {"date": r[0], "exercise": r[1], "muscle_group": r[2],
-         "sets": r[3], "reps": r[4], "weight": r[5], "notes": r[6]}
+         "sets": r[3], "reps": r[4], "weight": r[5], "notes": r[6],
+         "cardio_type": r[7] or "", "duration_min": r[8] or 0,
+         "distance_km": r[9] or 0.0, "avg_hr": r[10] or 0}
         for r in rows
     ]
 
@@ -83,16 +102,37 @@ def get_muscle_summary(user_name: str) -> str:
 
 def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
     """Форматированный текст тренировок для отправки в LLM."""
-    workouts = get_workouts(user_name, limit)
-    if not workouts:
+    init_workout_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT workout_date, exercise, muscle_group, sets, reps, weight_kg,
+                   notes, cardio_type, duration_min, distance_km, avg_hr
+            FROM workouts WHERE user_name = ?
+            ORDER BY workout_date DESC, id DESC LIMIT ?
+        """, (user_name, limit)).fetchall()
+    if not rows:
         return "Дневник тренировок пуст."
     lines = []
-    for w in workouts:
-        lines.append(
-            f"{w['date']} | {w['exercise']} ({w['muscle_group']}) | "
-            f"{w['sets']}x{w['reps']} @ {w['weight']} кг"
-            + (f" | {w['notes']}" if w['notes'] else "")
-        )
+    for r in rows:
+        date, exercise, mg, sets, reps, weight, notes, ctype, dur, dist, hr = r
+        if mg in ("Кардио", "Cardio", "קרדיו") or ctype or dur:
+            parts = [f"{date} | {exercise} ({mg})"]
+            if ctype:
+                parts.append(ctype)
+            if dur:
+                parts.append(f"{dur} мин")
+            if dist:
+                parts.append(f"{dist} км")
+            if hr:
+                parts.append(f"пульс {hr} уд/мин")
+            if notes:
+                parts.append(notes)
+            lines.append(" | ".join(parts))
+        else:
+            lines.append(
+                f"{date} | {exercise} ({mg}) | {sets}x{reps} @ {weight} кг"
+                + (f" | {notes}" if notes else "")
+            )
     return "\n".join(lines)
 
 

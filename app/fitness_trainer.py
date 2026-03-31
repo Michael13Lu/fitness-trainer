@@ -445,16 +445,51 @@ with tab_diary:
         w_exercise = st.text_input(t(lang, "exercise"), placeholder=t(lang, "exercise_placeholder"))
         w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS)
     with col2:
-        w_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20, value=3)
-        w_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10)
-        w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0, value=0.0, step=2.5)
+        is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
+
+        if is_cardio:
+            CARDIO_TYPES = ["🏃 Бег", "🚴 Велосипед", "🏊 Плавание", "⛷️ Эллипсоид",
+                            "🚶 Ходьба", "🪜 Степпер", "🥊 Бокс/HIIT", "🛶 Гребля", "Другое"]
+            w_cardio_type = st.selectbox("Вид кардио", CARDIO_TYPES)
+            w_duration = st.number_input("⏱️ Длительность (мин)", min_value=1, max_value=300, value=30)
+            w_distance = st.number_input("📏 Дистанция (км)", min_value=0.0, max_value=200.0, value=0.0, step=0.1)
+            w_avg_hr = st.number_input("❤️ Средний пульс (уд/мин)", min_value=0, max_value=250, value=0)
+        else:
+            w_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20, value=3)
+            w_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10)
+            w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0, value=0.0, step=2.5)
+
+    # Пульсовая зона (если кардио и пульс введён)
+    if is_cardio and w_avg_hr > 0:
+        max_hr = 220 - age
+        pct = w_avg_hr / max_hr * 100
+        if pct < 60:
+            zone, zone_name = 1, "Восстановление"
+        elif pct < 70:
+            zone, zone_name = 2, "Жиросжигание"
+        elif pct < 80:
+            zone, zone_name = 3, "Аэробная"
+        elif pct < 90:
+            zone, zone_name = 4, "Анаэробная"
+        else:
+            zone, zone_name = 5, "Максимальная"
+        colors = {1: "🟦", 2: "🟩", 3: "🟨", 4: "🟧", 5: "🟥"}
+        st.info(f"{colors[zone]} **Зона {zone} — {zone_name}** ({pct:.0f}% от макс. пульса {max_hr})")
+
     w_notes = st.text_input(t(lang, "notes"), placeholder=t(lang, "notes_placeholder"))
 
     col_add, col_del = st.columns([0.3, 0.7])
     with col_add:
         if st.button(t(lang, "add_exercise"), use_container_width=True):
             if w_exercise:
-                add_exercise(name, str(w_date), w_exercise, w_muscle, w_sets, w_reps, w_weight, w_notes)
+                if is_cardio:
+                    add_exercise(name, str(w_date), w_exercise, w_muscle,
+                                 notes=w_notes, cardio_type=w_cardio_type,
+                                 duration_min=w_duration, distance_km=w_distance,
+                                 avg_hr=w_avg_hr)
+                else:
+                    add_exercise(name, str(w_date), w_exercise, w_muscle,
+                                 w_sets, w_reps, w_weight, w_notes)
                 st.success(f"{t(lang, 'recorded')}: {w_exercise}")
                 st.rerun()
             else:
@@ -477,7 +512,19 @@ with tab_diary:
                     # Формируем описание из всех упражнений
                     lines = []
                     for e in today_exercises:
-                        line = f"• {e['exercise']} ({e['muscle_group']}) — {e['sets']}×{e['reps']} @ {e['weight']} кг"
+                        if e["cardio_type"] or e["duration_min"]:
+                            parts = [f"• {e['exercise']} ({e['muscle_group']})"]
+                            if e["cardio_type"]:
+                                parts.append(e["cardio_type"])
+                            if e["duration_min"]:
+                                parts.append(f"{e['duration_min']} мин")
+                            if e["distance_km"]:
+                                parts.append(f"{e['distance_km']} км")
+                            if e["avg_hr"]:
+                                parts.append(f"пульс {e['avg_hr']} уд/мин")
+                            line = " — ".join(parts)
+                        else:
+                            line = f"• {e['exercise']} ({e['muscle_group']}) — {e['sets']}×{e['reps']} @ {e['weight']} кг"
                         if e["notes"]:
                             line += f"  [{e['notes']}]"
                         lines.append(line)
