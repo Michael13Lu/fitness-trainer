@@ -551,9 +551,29 @@ with tab_diary:
     st.subheader(t(lang, "workout_history"))
     workouts = get_workouts(name, limit=50)
     if workouts:
-        df = pd.DataFrame(workouts)
-        df.columns = t(lang, "table_cols")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        rows = []
+        for w in workouts:
+            if w["cardio_type"] or w["duration_min"]:
+                parts = []
+                if w["cardio_type"]:
+                    parts.append(w["cardio_type"])
+                if w["duration_min"]:
+                    parts.append(f"{w['duration_min']} мин")
+                if w["distance_km"]:
+                    parts.append(f"{w['distance_km']} км")
+                if w["avg_hr"]:
+                    parts.append(f"♥ {w['avg_hr']}")
+                details = " · ".join(parts)
+            else:
+                details = f"{w['sets']}×{w['reps']} @ {w['weight']} кг"
+            rows.append({
+                t(lang, "table_cols")[0]: w["date"],
+                t(lang, "table_cols")[1]: w["exercise"],
+                t(lang, "table_cols")[2]: w["muscle_group"],
+                t(lang, "table_cols")[3]: details,
+                t(lang, "table_cols")[4]: w["notes"],
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     else:
         st.info(t(lang, "no_workouts"))
 
