@@ -787,11 +787,13 @@ with tab_diary:
 
                     creds = creds_from_dict(st.session_state.gcal_creds)
                     service = gcal_build("calendar", "v3", credentials=creds)
+                    _ev_start = f"{w_date}T{w_start.strftime('%H:%M:%S')}"
+                    _ev_end = f"{w_date}T{w_end.strftime('%H:%M:%S')}"
                     event = {
                         "summary": f"🏋️ {cal_title}",
                         "description": description,
-                        "start": {"date": str(w_date)},
-                        "end": {"date": str(w_date)},
+                        "start": {"dateTime": _ev_start},
+                        "end": {"dateTime": _ev_end},
                         "colorId": "2",
                     }
                     created = service.events().insert(calendarId="primary", body=event).execute()
