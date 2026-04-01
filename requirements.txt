@@ -6,6 +6,7 @@ langchain-classic
 streamlit
 python-dotenv
 audio-recorder-streamlit
+streamlit-paste-button
 groq
 pypdf
 pandas
