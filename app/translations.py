@@ -100,6 +100,8 @@ T = {
         "btn_save": "✅ Сохранить",
         "btn_skip": "✖ Пропустить",
         # Системный промпт тренера
+        "video_tutorials": "🎬 Видео по технике",
+        "video_search_suffix": "техника выполнения",
         "system_prompt_lang": "Отвечай на русском языке.",
     },
     "en": {
@@ -185,6 +187,8 @@ T = {
         "save_to_diary": "➕ Save exercise to diary?",
         "btn_save": "✅ Save",
         "btn_skip": "✖ Skip",
+        "video_tutorials": "🎬 Technique videos",
+        "video_search_suffix": "exercise technique tutorial",
         "system_prompt_lang": "Always respond in English.",
     },
     "es": {
@@ -270,6 +274,8 @@ T = {
         "save_to_diary": "➕ ¿Guardar ejercicio en el diario?",
         "btn_save": "✅ Guardar",
         "btn_skip": "✖ Omitir",
+        "video_tutorials": "🎬 Videos de técnica",
+        "video_search_suffix": "técnica ejercicio tutorial",
         "system_prompt_lang": "Responde siempre en español.",
     },
     "de": {
@@ -355,6 +361,8 @@ T = {
         "save_to_diary": "➕ Übung ins Tagebuch speichern?",
         "btn_save": "✅ Speichern",
         "btn_skip": "✖ Überspringen",
+        "video_tutorials": "🎬 Technik-Videos",
+        "video_search_suffix": "Übung Technik Tutorial",
         "system_prompt_lang": "Antworte immer auf Deutsch.",
     },
     "fr": {
@@ -440,6 +448,8 @@ T = {
         "save_to_diary": "➕ Sauvegarder l'exercice dans le journal ?",
         "btn_save": "✅ Sauvegarder",
         "btn_skip": "✖ Ignorer",
+        "video_tutorials": "🎬 Vidéos de technique",
+        "video_search_suffix": "technique exercice tutoriel",
         "system_prompt_lang": "Réponds toujours en français.",
     },
     "he": {
@@ -525,6 +535,8 @@ T = {
         "save_to_diary": "➕ לשמור תרגיל ביומן?",
         "btn_save": "✅ שמור",
         "btn_skip": "✖ דלג",
+        "video_tutorials": "🎬 סרטוני טכניקה",
+        "video_search_suffix": "טכניקת ביצוע תרגיל",
         "system_prompt_lang": "ענה תמיד בעברית.",
     },
 }

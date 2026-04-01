@@ -547,6 +547,30 @@ if msg:
                 response = chain.invoke(get_chain_input(user_input))
         st.markdown(response)
 
+        # Извлекаем упражнения из ответа и показываем ссылки на YouTube
+        _ex_extract_prompt = (
+            f"Из следующего текста выпиши все названия упражнений в виде JSON-массива строк. "
+            f"Если упражнений нет — верни пустой массив []. Только JSON, без объяснений.\n\n{response[:2000]}"
+        )
+        try:
+            _ex_raw = llm_text.invoke(_ex_extract_prompt).content.strip()
+            import re as _re2, json as _json2
+            _ex_match = _re2.search(r'\[.*?\]', _ex_raw, _re2.DOTALL)
+            _exercises_found = _json2.loads(_ex_match.group()) if _ex_match else []
+        except Exception:
+            _exercises_found = []
+
+        if _exercises_found:
+            with st.expander(t(lang, "video_tutorials"), expanded=False):
+                _suffix = t(lang, "video_search_suffix")
+                _cols = st.columns(min(len(_exercises_found), 3))
+                for _i, _ex in enumerate(_exercises_found[:6]):
+                    _query = f"{_ex} {_suffix}".replace(" ", "+")
+                    _url = f"https://www.youtube.com/results?search_query={_query}"
+                    with _cols[_i % 3]:
+                        st.markdown(f"**{_ex}**")
+                        st.markdown(f"[▶ YouTube]({_url})")
+
     if voice_response:
         speak(response)
     st.session_state.history.add_user_message(user_input or "[file]")
