@@ -14,7 +14,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_community.chat_message_histories import ChatMessageHistory
 from audio_recorder_streamlit import audio_recorder
-from streamlit_paste_button import paste_image_button
 from groq import Groq
 from memory_store import load_messages, save_message, clear_history, save_language, load_language, save_profile, load_profile
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
@@ -475,15 +474,13 @@ with tab_chat:
                 st.image(msg["image"], width=200)
             st.markdown(msg["content"])
 
-    # Микрофон + вставка из буфера
-    col_mic, col_paste, _ = st.columns([0.08, 0.1, 0.82])
+    # Микрофон
+    col_mic, _ = st.columns([0.12, 0.88])
     with col_mic:
         audio_bytes = audio_recorder(
             text="", recording_color="#e74c3c",
             neutral_color="#888888", icon_size="2x",
         )
-    with col_paste:
-        paste_result = paste_image_button("📋", key="paste_img")
 
     # Голосовой ввод
     if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.get("last_audio"):
@@ -505,29 +502,6 @@ with tab_chat:
             save_message(name, "user", voice_text)
             save_message(name, "assistant", response)
             st.session_state.messages.append({"role": "assistant", "content": response})
-
-    # Обработка вставленного изображения из буфера
-    if paste_result.image_data is not None:
-        _paste_buf = io.BytesIO()
-        paste_result.image_data.save(_paste_buf, format="PNG")
-        _paste_bytes = _paste_buf.getvalue()
-        with st.chat_message("user"):
-            st.image(_paste_bytes, width=200)
-            st.markdown("📋 Изображение из буфера")
-        st.session_state.messages.append({"role": "user", "content": "📋 Изображение из буфера",
-                                           "image": _paste_bytes})
-        with st.chat_message("assistant"):
-            with st.spinner(t(lang, "thinking")):
-                exercise_info = extract_exercise_from_image(_paste_bytes, "image/png")
-                response = analyze_with_image(_paste_bytes, "image/png", "")
-                if exercise_info.get("exercise"):
-                    st.session_state.detected_exercise = exercise_info
-            st.markdown(response)
-        st.session_state.history.add_user_message("(image pasted from clipboard)")
-        st.session_state.history.add_ai_message(response)
-        save_message(name, "user", "📋 Изображение из буфера")
-        save_message(name, "assistant", response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
 
 # Текстовый ввод + файл
 msg = st.chat_input(
