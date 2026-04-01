@@ -16,7 +16,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from audio_recorder_streamlit import audio_recorder
 from groq import Groq
 from memory_store import load_messages, save_message, clear_history, save_language, load_language, save_profile, load_profile
-from muscle_diagram import get_muscle_svg
+from muscle_diagram import get_muscle_html
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise,
                            get_workouts_by_date)
@@ -653,7 +653,7 @@ with tab_diary:
                                    on_change=_on_exercise_change)
         w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS, index=_mg_index)
         if w_muscle != MUSCLE_GROUPS[-1]:  # не показываем для кардио
-            components.html(get_muscle_svg(w_muscle), height=328)
+            components.html(get_muscle_html(w_muscle), height=380)
     with col2:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
 
