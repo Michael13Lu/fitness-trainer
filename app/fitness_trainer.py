@@ -309,6 +309,68 @@ chain = prompt | llm_text | StrOutputParser()
 
 MUSCLE_GROUPS = t(lang, "muscle_groups")
 
+# Keywords → muscle group index (sorted longest-first to avoid false prefix matches)
+_EXERCISE_MUSCLE_MAP = sorted({
+    # Грудь (0)
+    "жим лёжа": 0, "жим на груд": 0, "отжимани": 0, "разводка": 0,
+    "кроссовер": 0, "бабочка": 0, "грудн": 0, "пек дек": 0,
+    "bench press": 0, "chest press": 0, "chest fly": 0, "dips": 0,
+    # Спина (1)
+    "тяга верхнего": 1, "тяга нижнего": 1, "тяга в наклоне": 1, "становая тяга": 1,
+    "горизонтальная тяга": 1, "подтягивани": 1, "широчайш": 1, "гиперэкстензи": 1,
+    "deadlift": 1, "pulldown": 1, "pullup": 1, "pull-up": 1,
+    # Плечи (2)
+    "жим стоя": 2, "жим сидя": 2, "армейский жим": 2,
+    "махи": 2, "дельт": 2, "шраги": 2,
+    "overhead press": 2, "lateral raise": 2, "shoulder press": 2,
+    # Бицепс (3)
+    "сгибани рук": 3, "молоток": 3, "бицепс": 3,
+    "bicep curl": 3, "hammer curl": 3,
+    # Трицепс (4)
+    "разгибани рук": 4, "французский жим": 4, "трицепс": 4,
+    "tricep": 4, "pushdown": 4, "skull crusher": 4,
+    # Пресс (5)
+    "скручивани": 5, "планк": 5, "подъём ног": 5, "подъем ног": 5,
+    "crunch": 5, "plank": 5, "sit-up": 5,
+    # Квадрицепс (6)
+    "приседани": 6, "жим ногами": 6, "выпад": 6, "разгибани ног": 6, "квадрицепс": 6,
+    "squat": 6, "leg press": 6, "lunge": 6, "leg extension": 6,
+    # Бицепс бедра (7)
+    "сгибани ног": 7, "бицепс бедра": 7, "румынская тяга": 7,
+    "hamstring": 7, "leg curl": 7, "romanian": 7,
+    # Ягодицы (8)
+    "ягодичный мостик": 8, "ягодиц": 8, "ягодич": 8, "отведени": 8,
+    "hip thrust": 8, "glute": 8,
+    # Икры (9)
+    "подъём на носк": 9, "подъем на носк": 9, "икр": 9,
+    "calf raise": 9, "calf": 9,
+    # Кардио (10)
+    "кардио": 10, "cardio": 10,
+    # Общие (fallback — короткие, проверяются последними)
+    "тяга": 1, "row": 1,
+    "жим": 0,
+    "сгибани": 3,
+    "разгибани": 4,
+    "пресс": 5,
+}.items(), key=lambda x: -len(x[0]))
+
+
+def _detect_muscle_index(name: str):
+    name_lower = name.lower()
+    for kw, idx in _EXERCISE_MUSCLE_MAP:
+        if kw in name_lower:
+            return idx
+    return None
+
+
+def _on_exercise_change():
+    name = st.session_state.get("_w_exercise_input", "")
+    detected = _detect_muscle_index(name)
+    if detected is not None:
+        st.session_state["_auto_mg_index"] = detected
+    elif not name:
+        st.session_state.pop("_auto_mg_index", None)
+
 
 def get_chain_input(user_input: str) -> dict:
     return {
@@ -544,14 +606,24 @@ with tab_diary:
     )
     st.session_state.workout_name = w_name
 
-    _mg_voice = _vp.get("muscle_group", MUSCLE_GROUPS[0])
-    _mg_index = MUSCLE_GROUPS.index(_mg_voice) if _mg_voice in MUSCLE_GROUPS else 0
+    _mg_voice = _vp.get("muscle_group")
+    if _mg_voice and _mg_voice in MUSCLE_GROUPS:
+        st.session_state["_auto_mg_index"] = MUSCLE_GROUPS.index(_mg_voice)
+    if _vp.get("exercise"):
+        st.session_state["_w_exercise_input"] = _vp["exercise"]
+        if not (_mg_voice and _mg_voice in MUSCLE_GROUPS):
+            detected = _detect_muscle_index(_vp["exercise"])
+            if detected is not None:
+                st.session_state["_auto_mg_index"] = detected
+    _mg_index = st.session_state.get("_auto_mg_index", 0)
 
     col1, col2 = st.columns(2)
     with col1:
         w_date = st.date_input(t(lang, "date"), value=date.today())
-        w_exercise = st.text_input(t(lang, "exercise"), value=_vp.get("exercise", ""),
-                                   placeholder=t(lang, "exercise_placeholder"))
+        w_exercise = st.text_input(t(lang, "exercise"),
+                                   placeholder=t(lang, "exercise_placeholder"),
+                                   key="_w_exercise_input",
+                                   on_change=_on_exercise_change)
         w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS, index=_mg_index)
     with col2:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
