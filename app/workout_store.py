@@ -29,6 +29,7 @@ def init_workout_db():
             ("avg_hr", "INTEGER"),
             ("workout_start", "TEXT"),
             ("workout_end", "TEXT"),
+            ("rest_sec", "INTEGER"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE workouts ADD COLUMN {col} {typedef}")
@@ -40,18 +41,18 @@ def add_exercise(user_name: str, workout_date: str, exercise: str,
                  muscle_group: str, sets: int = 0, reps: int = 0, weight_kg: float = 0.0,
                  notes: str = "", cardio_type: str = "", duration_min: int = 0,
                  distance_km: float = 0.0, avg_hr: int = 0,
-                 workout_start: str = "", workout_end: str = ""):
+                 workout_start: str = "", workout_end: str = "", rest_sec: int = 0):
     init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             INSERT INTO workouts
               (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg,
                notes, cardio_type, duration_min, distance_km, avg_hr,
-               workout_start, workout_end)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               workout_start, workout_end, rest_sec)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg,
               notes, cardio_type, duration_min, distance_km, avg_hr,
-              workout_start, workout_end))
+              workout_start, workout_end, rest_sec))
 
 
 def get_workouts(user_name: str, limit: int = 100) -> list:

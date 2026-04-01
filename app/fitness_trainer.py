@@ -666,6 +666,8 @@ with tab_diary:
                                      value=max(1, int(_vp.get("reps", 10))))
             w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0,
                                        value=float(_vp.get("weight", 0.0)), step=2.5)
+            w_rest = st.number_input("💤 Отдых между подходами (сек)", min_value=0, max_value=600,
+                                     value=60, step=15)
 
     # Пульсовая зона (если кардио и пульс введён)
     if is_cardio and w_avg_hr > 0:
@@ -702,7 +704,8 @@ with tab_diary:
                 else:
                     add_exercise(name, str(w_date), w_exercise, w_muscle,
                                  w_sets, w_reps, w_weight, w_notes,
-                                 workout_start=_wstart, workout_end=_wend)
+                                 workout_start=_wstart, workout_end=_wend,
+                                 rest_sec=w_rest)
                 st.success(f"{t(lang, 'recorded')}: {w_exercise}")
                 st.rerun()
             else:
