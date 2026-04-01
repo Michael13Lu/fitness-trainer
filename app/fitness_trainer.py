@@ -570,10 +570,12 @@ if st.session_state.get("detected_exercise", {}).get("exercise"):
             q_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10, key="q_reps")
         with col4:
             q_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, value=0.0, step=2.5, key="q_weight")
+            q_rest = st.number_input("💤 Отдых (сек)", min_value=0, max_value=600, value=60, step=15, key="q_rest")
         col_save, col_skip = st.columns(2)
         with col_save:
             if st.button(t(lang, "btn_save"), use_container_width=True):
-                add_exercise(name, str(date.today()), q_exercise, q_muscle, q_sets, q_reps, q_weight)
+                add_exercise(name, str(date.today()), q_exercise, q_muscle, q_sets, q_reps, q_weight,
+                             rest_sec=q_rest)
                 st.success(f"{t(lang, 'recorded')}: {q_exercise}")
                 st.session_state.detected_exercise = {}
                 st.rerun()
