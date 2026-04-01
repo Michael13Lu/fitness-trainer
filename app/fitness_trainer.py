@@ -483,8 +483,7 @@ with tab_chat:
             neutral_color="#888888", icon_size="2x",
         )
     with col_paste:
-        paste_result = paste_image_button("📋", key="paste_img",
-                                          help="Вставить изображение из буфера (Ctrl+V)")
+        paste_result = paste_image_button("📋", key="paste_img")
 
     # Голосовой ввод
     if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.get("last_audio"):
