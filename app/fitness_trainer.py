@@ -634,6 +634,16 @@ with tab_diary:
     col1, col2 = st.columns(2)
     with col1:
         w_date = st.date_input(t(lang, "date"), value=date.today())
+        _tc1, _tc2 = st.columns(2)
+        with _tc1:
+            w_start = st.time_input("⏱️ Начало", value=_dt.time(9, 0), key="workout_start_time")
+        with _tc2:
+            w_end = st.time_input("🏁 Конец", value=_dt.time(10, 0), key="workout_end_time")
+        if w_end > w_start:
+            _dur_min = int((_dt.datetime.combine(_dt.date.today(), w_end) -
+                            _dt.datetime.combine(_dt.date.today(), w_start)).total_seconds() // 60)
+            st.caption(f"⏳ Длительность: **{_dur_min // 60} ч {_dur_min % 60} мин**" if _dur_min >= 60
+                       else f"⏳ Длительность: **{_dur_min} мин**")
         w_exercise = st.text_input(t(lang, "exercise"),
                                    placeholder=t(lang, "exercise_placeholder"),
                                    key="_w_exercise_input",
@@ -681,14 +691,18 @@ with tab_diary:
     with col_add:
         if st.button(t(lang, "add_exercise"), use_container_width=True):
             if w_exercise:
+                _wstart = w_start.strftime("%H:%M")
+                _wend = w_end.strftime("%H:%M")
                 if is_cardio:
                     add_exercise(name, str(w_date), w_exercise, w_muscle,
                                  notes=w_notes, cardio_type=w_cardio_type,
                                  duration_min=w_duration, distance_km=w_distance,
-                                 avg_hr=w_avg_hr)
+                                 avg_hr=w_avg_hr,
+                                 workout_start=_wstart, workout_end=_wend)
                 else:
                     add_exercise(name, str(w_date), w_exercise, w_muscle,
-                                 w_sets, w_reps, w_weight, w_notes)
+                                 w_sets, w_reps, w_weight, w_notes,
+                                 workout_start=_wstart, workout_end=_wend)
                 st.success(f"{t(lang, 'recorded')}: {w_exercise}")
                 st.rerun()
             else:

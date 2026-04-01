@@ -21,12 +21,14 @@ def init_workout_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Кардио-поля — добавляем если ещё нет
+        # Доп. поля — добавляем если ещё нет
         for col, typedef in [
             ("cardio_type", "TEXT"),
             ("duration_min", "INTEGER"),
             ("distance_km", "REAL"),
             ("avg_hr", "INTEGER"),
+            ("workout_start", "TEXT"),
+            ("workout_end", "TEXT"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE workouts ADD COLUMN {col} {typedef}")
@@ -37,16 +39,19 @@ def init_workout_db():
 def add_exercise(user_name: str, workout_date: str, exercise: str,
                  muscle_group: str, sets: int = 0, reps: int = 0, weight_kg: float = 0.0,
                  notes: str = "", cardio_type: str = "", duration_min: int = 0,
-                 distance_km: float = 0.0, avg_hr: int = 0):
+                 distance_km: float = 0.0, avg_hr: int = 0,
+                 workout_start: str = "", workout_end: str = ""):
     init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             INSERT INTO workouts
               (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg,
-               notes, cardio_type, duration_min, distance_km, avg_hr)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               notes, cardio_type, duration_min, distance_km, avg_hr,
+               workout_start, workout_end)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (user_name, workout_date, exercise, muscle_group, sets, reps, weight_kg,
-              notes, cardio_type, duration_min, distance_km, avg_hr))
+              notes, cardio_type, duration_min, distance_km, avg_hr,
+              workout_start, workout_end))
 
 
 def get_workouts(user_name: str, limit: int = 100) -> list:
@@ -106,7 +111,8 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT workout_date, exercise, muscle_group, sets, reps, weight_kg,
-                   notes, cardio_type, duration_min, distance_km, avg_hr
+                   notes, cardio_type, duration_min, distance_km, avg_hr,
+                   workout_start, workout_end
             FROM workouts WHERE user_name = ?
             ORDER BY workout_date DESC, id DESC LIMIT ?
         """, (user_name, limit)).fetchall()
@@ -114,9 +120,10 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
         return "Дневник тренировок пуст."
     lines = []
     for r in rows:
-        date, exercise, mg, sets, reps, weight, notes, ctype, dur, dist, hr = r
+        date, exercise, mg, sets, reps, weight, notes, ctype, dur, dist, hr, wstart, wend = r
+        time_str = f" [{wstart}–{wend}]" if wstart and wend else ""
         if mg in ("Кардио", "Cardio", "קרדיו") or ctype or dur:
-            parts = [f"{date} | {exercise} ({mg})"]
+            parts = [f"{date}{time_str} | {exercise} ({mg})"]
             if ctype:
                 parts.append(ctype)
             if dur:
@@ -130,7 +137,7 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
             lines.append(" | ".join(parts))
         else:
             lines.append(
-                f"{date} | {exercise} ({mg}) | {sets}x{reps} @ {weight} кг"
+                f"{date}{time_str} | {exercise} ({mg}) | {sets}x{reps} @ {weight} кг"
                 + (f" | {notes}" if notes else "")
             )
     return "\n".join(lines)
