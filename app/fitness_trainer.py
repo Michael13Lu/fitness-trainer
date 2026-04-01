@@ -607,14 +607,16 @@ with tab_diary:
     st.session_state.workout_name = w_name
 
     _mg_voice = _vp.get("muscle_group")
-    if _mg_voice and _mg_voice in MUSCLE_GROUPS:
-        st.session_state["_auto_mg_index"] = MUSCLE_GROUPS.index(_mg_voice)
     if _vp.get("exercise"):
         st.session_state["_w_exercise_input"] = _vp["exercise"]
-        if not (_mg_voice and _mg_voice in MUSCLE_GROUPS):
-            detected = _detect_muscle_index(_vp["exercise"])
-            if detected is not None:
-                st.session_state["_auto_mg_index"] = detected
+        detected = _detect_muscle_index(_vp["exercise"])
+        if detected is not None:
+            # Local keyword map is more reliable than LLM for known exercises
+            st.session_state["_auto_mg_index"] = detected
+        elif _mg_voice and _mg_voice in MUSCLE_GROUPS:
+            st.session_state["_auto_mg_index"] = MUSCLE_GROUPS.index(_mg_voice)
+    elif _mg_voice and _mg_voice in MUSCLE_GROUPS:
+        st.session_state["_auto_mg_index"] = MUSCLE_GROUPS.index(_mg_voice)
     _mg_index = st.session_state.get("_auto_mg_index", 0)
 
     col1, col2 = st.columns(2)
