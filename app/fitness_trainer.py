@@ -571,7 +571,7 @@ if st.session_state.get("detected_exercise", {}).get("exercise"):
             q_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10, key="q_reps")
         with col4:
             q_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, value=0.0, step=2.5, key="q_weight")
-            q_rest = st.number_input("💤 Отдых (сек)", min_value=0, max_value=600, value=60, step=15, key="q_rest")
+            q_rest = st.number_input(t(lang, "rest_sec"), min_value=0, max_value=600, value=60, step=15, key="q_rest")
         col_save, col_skip = st.columns(2)
         with col_save:
             if st.button(t(lang, "btn_save"), use_container_width=True):
@@ -600,9 +600,9 @@ with tab_diary:
     if "workout_name" not in st.session_state:
         st.session_state.workout_name = ""
     w_name = st.text_input(
-        "🏷️ Название тренировки",
+        t(lang, "workout_name"),
         value=st.session_state.workout_name,
-        placeholder="День груди, Ног, Спина и бицепс...",
+        placeholder=t(lang, "workout_name_placeholder"),
         key="w_name_input",
     )
     st.session_state.workout_name = w_name
@@ -639,14 +639,16 @@ with tab_diary:
         w_date = st.date_input(t(lang, "date"), value=date.today())
         _tc1, _tc2 = st.columns(2)
         with _tc1:
-            w_start = st.time_input("⏱️ Начало", value=_dt.time(9, 0), key="workout_start_time")
+            w_start = st.time_input(t(lang, "workout_start"), value=_dt.time(9, 0), key="workout_start_time")
         with _tc2:
-            w_end = st.time_input("🏁 Конец", value=_dt.time(10, 0), key="workout_end_time")
+            w_end = st.time_input(t(lang, "workout_end"), value=_dt.time(10, 0), key="workout_end_time")
         if w_end > w_start:
             _dur_min = int((_dt.datetime.combine(_dt.date.today(), w_end) -
                             _dt.datetime.combine(_dt.date.today(), w_start)).total_seconds() // 60)
-            st.caption(f"⏳ Длительность: **{_dur_min // 60} ч {_dur_min % 60} мин**" if _dur_min >= 60
-                       else f"⏳ Длительность: **{_dur_min} мин**")
+            _h, _m = _dur_min // 60, _dur_min % 60
+            _dur_str = (f"**{_h} {t(lang,'hours_short')} {_m} {t(lang,'min_short')}**" if _dur_min >= 60
+                        else f"**{_m} {t(lang,'min_short')}**")
+            st.caption(f"{t(lang, 'duration')} {_dur_str}")
         w_exercise = st.text_input(t(lang, "exercise"),
                                    placeholder=t(lang, "exercise_placeholder"),
                                    key="_w_exercise_input",
@@ -671,7 +673,7 @@ with tab_diary:
                                      value=max(1, int(_vp.get("reps", 10))))
             w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0,
                                        value=float(_vp.get("weight", 0.0)), step=2.5)
-            w_rest = st.number_input("💤 Отдых между подходами (сек)", min_value=0, max_value=600,
+            w_rest = st.number_input(t(lang, "rest_sec"), min_value=0, max_value=600,
                                      value=60, step=15)
 
     # Пульсовая зона (если кардио и пульс введён)
