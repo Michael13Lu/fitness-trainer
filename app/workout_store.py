@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from datetime import date
+from datetime import date  # noqa
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
 
