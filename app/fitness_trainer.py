@@ -565,9 +565,9 @@ with tab_diary:
             w_avg_hr = st.number_input("❤️ Средний пульс (уд/мин)", min_value=0, max_value=250, value=0)
         else:
             w_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20,
-                                     value=int(_vp.get("sets", 3)))
+                                     value=max(1, int(_vp.get("sets", 3))))
             w_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100,
-                                     value=int(_vp.get("reps", 10)))
+                                     value=max(1, int(_vp.get("reps", 10))))
             w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0,
                                        value=float(_vp.get("weight", 0.0)), step=2.5)
 
