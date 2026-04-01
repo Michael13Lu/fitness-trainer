@@ -364,12 +364,10 @@ def _detect_muscle_index(name: str):
 
 
 def _on_exercise_change():
-    name = st.session_state.get("_w_exercise_input", "")
-    detected = _detect_muscle_index(name)
-    if detected is not None:
-        st.session_state["_auto_mg_index"] = detected
-    elif not name:
+    if not st.session_state.get("_w_exercise_input", ""):
         st.session_state.pop("_auto_mg_index", None)
+    else:
+        st.session_state["_need_muscle_detect"] = True
 
 
 def get_chain_input(user_input: str) -> dict:
@@ -610,14 +608,27 @@ with tab_diary:
     if _vp.get("exercise"):
         st.session_state["_w_exercise_input"] = _vp["exercise"]
         if _mg_voice and _mg_voice in MUSCLE_GROUPS:
-            # LLM determined the muscle group — trust it
             st.session_state["_auto_mg_index"] = MUSCLE_GROUPS.index(_mg_voice)
         else:
-            detected = _detect_muscle_index(_vp["exercise"])
-            if detected is not None:
-                st.session_state["_auto_mg_index"] = detected
+            st.session_state["_need_muscle_detect"] = True
     elif _mg_voice and _mg_voice in MUSCLE_GROUPS:
         st.session_state["_auto_mg_index"] = MUSCLE_GROUPS.index(_mg_voice)
+
+    # LLM auto-detect muscle group when exercise name is typed or voice-filled without group
+    _ex_for_detect = st.session_state.get("_w_exercise_input", "")
+    if st.session_state.pop("_need_muscle_detect", False) and _ex_for_detect:
+        with st.spinner(t(lang, "thinking")):
+            _detect_prompt = (
+                f"Определи группу мышц для упражнения: '{_ex_for_detect}'. "
+                f"Ответь только одним значением из списка: {MUSCLE_GROUPS}. "
+                f"Без объяснений."
+            )
+            _detected_mg = llm_text.invoke(_detect_prompt).content.strip()
+        for _i, _mg in enumerate(MUSCLE_GROUPS):
+            if _mg.lower() in _detected_mg.lower() or _detected_mg.lower() in _mg.lower():
+                st.session_state["_auto_mg_index"] = _i
+                break
+
     _mg_index = st.session_state.get("_auto_mg_index", 0)
 
     col1, col2 = st.columns(2)
