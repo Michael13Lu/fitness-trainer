@@ -59,19 +59,30 @@ def get_workouts(user_name: str, limit: int = 100) -> list:
     init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
-            SELECT workout_date, exercise, muscle_group, sets, reps, weight_kg, notes,
+            SELECT id, workout_date, exercise, muscle_group, sets, reps, weight_kg, notes,
                    cardio_type, duration_min, distance_km, avg_hr
             FROM workouts WHERE user_name = ?
             ORDER BY workout_date DESC, id DESC
             LIMIT ?
         """, (user_name, limit)).fetchall()
     return [
-        {"date": r[0], "exercise": r[1], "muscle_group": r[2],
-         "sets": r[3], "reps": r[4], "weight": r[5], "notes": r[6],
-         "cardio_type": r[7] or "", "duration_min": r[8] or 0,
-         "distance_km": r[9] or 0.0, "avg_hr": r[10] or 0}
+        {"id": r[0], "date": r[1], "exercise": r[2], "muscle_group": r[3],
+         "sets": r[4], "reps": r[5], "weight": r[6], "notes": r[7],
+         "cardio_type": r[8] or "", "duration_min": r[9] or 0,
+         "distance_km": r[10] or 0.0, "avg_hr": r[11] or 0}
         for r in rows
     ]
+
+
+def update_exercise(row_id: int, exercise: str, muscle_group: str,
+                    sets: int, reps: int, weight_kg: float, notes: str):
+    init_workout_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
+            UPDATE workouts
+            SET exercise=?, muscle_group=?, sets=?, reps=?, weight_kg=?, notes=?
+            WHERE id=?
+        """, (exercise, muscle_group, sets, reps, weight_kg, notes, row_id))
 
 
 def get_exercise_history(user_name: str, exercise: str) -> list:

@@ -19,7 +19,7 @@ from memory_store import load_messages, save_message, clear_history, save_langua
 from muscle_diagram import get_muscle_html
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise,
-                           get_workouts_by_date)
+                           get_workouts_by_date, update_exercise)
 from food_store import (add_food, get_food_by_date, get_food_history,
                         delete_last_food, get_daily_totals, get_food_as_text)
 import importlib
@@ -817,29 +817,44 @@ with tab_diary:
     st.subheader(t(lang, "workout_history"))
     workouts = get_workouts(name, limit=50)
     if workouts:
+        cols = t(lang, "table_cols")  # [Дата, Упражнение, Группа мышц, Подходы, Повторения, Вес, Заметки]
+        _id_col = "__id__"
         rows = []
         for w in workouts:
-            if w["cardio_type"] or w["duration_min"]:
-                parts = []
-                if w["cardio_type"]:
-                    parts.append(w["cardio_type"])
-                if w["duration_min"]:
-                    parts.append(f"{w['duration_min']} мин")
-                if w["distance_km"]:
-                    parts.append(f"{w['distance_km']} км")
-                if w["avg_hr"]:
-                    parts.append(f"♥ {w['avg_hr']}")
-                details = " · ".join(parts)
-            else:
-                details = f"{w['sets']}×{w['reps']} @ {w['weight']} кг"
             rows.append({
-                t(lang, "table_cols")[0]: w["date"],
-                t(lang, "table_cols")[1]: w["exercise"],
-                t(lang, "table_cols")[2]: w["muscle_group"],
-                t(lang, "table_cols")[3]: details,
-                t(lang, "table_cols")[4]: w["notes"],
+                _id_col:  w["id"],
+                cols[0]:  w["date"],
+                cols[1]:  w["exercise"],
+                cols[2]:  w["muscle_group"],
+                t(lang, "sets"):     w["sets"],
+                t(lang, "reps"):     w["reps"],
+                t(lang, "weight_kg"): w["weight"],
+                cols[4]:  w["notes"] or "",
             })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        df = pd.DataFrame(rows)
+        edited = st.data_editor(
+            df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={_id_col: None},   # скрываем id
+            key="workout_editor",
+        )
+        # Сохраняем изменённые строки
+        changed = df.compare(edited).index.tolist()
+        for idx in changed:
+            row = edited.iloc[idx]
+            update_exercise(
+                row_id=int(row[_id_col]),
+                exercise=row[cols[1]],
+                muscle_group=row[cols[2]],
+                sets=int(row[t(lang, "sets")]),
+                reps=int(row[t(lang, "reps")]),
+                weight_kg=float(row[t(lang, "weight_kg")]),
+                notes=row[cols[4]],
+            )
+        if changed:
+            st.success(t(lang, "recorded") + " ✓")
+            st.rerun()
     else:
         st.info(t(lang, "no_workouts"))
 
