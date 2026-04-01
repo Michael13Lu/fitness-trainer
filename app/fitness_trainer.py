@@ -419,7 +419,7 @@ col_mic, _ = st.columns([0.12, 0.88])
 with col_mic:
     audio_bytes = audio_recorder(
         text="", recording_color="#e74c3c",
-        neutral_color="#888888", icon_size="lg",
+        neutral_color="#888888", icon_size="2x",
     )
 
 # Голосовой ввод
