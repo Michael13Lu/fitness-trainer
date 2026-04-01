@@ -653,7 +653,7 @@ with tab_diary:
                                    on_change=_on_exercise_change)
         w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS, index=_mg_index)
         if w_muscle != MUSCLE_GROUPS[-1]:  # не показываем для кардио
-            components.html(get_muscle_html(w_muscle), height=380)
+            components.html(get_muscle_html(w_muscle, lang=lang), height=380)
     with col2:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
 

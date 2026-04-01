@@ -142,13 +142,24 @@ def _render_view(polygons: dict, order: list, highlights: set) -> str:
     return "\n".join(parts)
 
 
-def get_muscle_html(muscle_group: str, height: int = 380) -> str:
+_VIEW_LABELS: dict[str, tuple[str, str]] = {
+    "ru": ("спереди", "сзади"),
+    "en": ("front",   "back"),
+    "es": ("frente",  "espalda"),
+    "de": ("vorne",   "hinten"),
+    "fr": ("avant",   "arrière"),
+    "he": ("קדמי",    "אחורי"),
+}
+
+
+def get_muscle_html(muscle_group: str, lang: str = "ru", height: int = 380) -> str:
     highlights = set(MUSCLE_MAP.get(muscle_group, []))
 
     front_svg = _render_view(_ANTERIOR, _FRONT_ORDER, highlights)
     back_svg  = _render_view(_POSTERIOR, _BACK_ORDER,  highlights)
 
     label_color = _ACTIVE if highlights else "#555"
+    lbl_front, lbl_back = _VIEW_LABELS.get(lang, _VIEW_LABELS["en"])
 
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -168,14 +179,14 @@ def get_muscle_html(muscle_group: str, height: int = 380) -> str:
          xmlns="http://www.w3.org/2000/svg">
       {front_svg}
     </svg>
-    <div class="view-label">спереди</div>
+    <div class="view-label">{lbl_front}</div>
   </div>
   <div>
     <svg viewBox="0 0 100 210" width="130" height="273"
          xmlns="http://www.w3.org/2000/svg">
       {back_svg}
     </svg>
-    <div class="view-label">сзади</div>
+    <div class="view-label">{lbl_back}</div>
   </div>
 </div>
 <div class="muscle-label">{muscle_group}</div>
