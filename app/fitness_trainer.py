@@ -104,8 +104,11 @@ _prof = st.session_state["profile"]
 for _k, _v in _PROFILE_DEFAULTS.items():
     _prof.setdefault(_k, _v)
 
+if "sidebar_video_id" not in st.session_state:
+    st.session_state.sidebar_video_id = None
+
 with st.sidebar:
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         if st.button(t(lang, "profile"), use_container_width=True):
             st.session_state.sidebar_section = "profile"
@@ -116,6 +119,9 @@ with st.sidebar:
         cal_label = "📅 ✓" if st.session_state.gcal_creds else "📅"
         if st.button(cal_label, use_container_width=True):
             st.session_state.sidebar_section = "calendar"
+    with c4:
+        if st.button("🎬", use_container_width=True):
+            st.session_state.sidebar_section = "video"
 
     st.divider()
 
@@ -181,6 +187,37 @@ with st.sidebar:
             st.link_button("🔗 Connect Google Calendar", auth_url, use_container_width=True)
         else:
             st.caption("Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env to enable")
+
+    # ── Видео по технике ─────────────────────────────────────
+    elif st.session_state.sidebar_section == "video":
+        st.markdown(f"**{t(lang, 'video_tutorials')}**")
+        _exercises_list = st.session_state.get("sidebar_exercises", [])
+        if _exercises_list:
+            _suffix = t(lang, "video_search_suffix")
+            _selected_ex = st.selectbox(
+                "📋", _exercises_list, label_visibility="collapsed"
+            )
+            _query = f"{_selected_ex} {_suffix}".replace(" ", "+")
+            _search_url = f"https://www.youtube.com/results?search_query={_query}"
+
+            # Встраиваем поиск YouTube через iframe
+            components.html(f"""
+                <iframe
+                    src="https://www.youtube.com/embed?listType=search&list={_query}"
+                    width="100%" height="220"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+                    allowfullscreen>
+                </iframe>
+                <div style="margin-top:6px; font-size:12px;">
+                    <a href="{_search_url}" target="_blank"
+                       style="color:#e74c3c; text-decoration:none;">
+                        🔍 Все результаты на YouTube
+                    </a>
+                </div>
+            """, height=260)
+        else:
+            st.caption("Спроси тренера составить программу — здесь появятся видео по упражнениям.")
 
 # Читаем профиль из session_state (всегда доступны)
 name = _prof["name"]
@@ -561,15 +598,8 @@ if msg:
             _exercises_found = []
 
         if _exercises_found:
-            with st.expander(t(lang, "video_tutorials"), expanded=False):
-                _suffix = t(lang, "video_search_suffix")
-                _cols = st.columns(min(len(_exercises_found), 3))
-                for _i, _ex in enumerate(_exercises_found[:6]):
-                    _query = f"{_ex} {_suffix}".replace(" ", "+")
-                    _url = f"https://www.youtube.com/results?search_query={_query}"
-                    with _cols[_i % 3]:
-                        st.markdown(f"**{_ex}**")
-                        st.markdown(f"[▶ YouTube]({_url})")
+            st.session_state.sidebar_exercises = _exercises_found[:8]
+            st.info(f"{t(lang, 'video_tutorials')}: нажми 🎬 в боковой панели", icon="🎬")
 
     if voice_response:
         speak(response)
