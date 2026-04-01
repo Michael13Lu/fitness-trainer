@@ -415,11 +415,11 @@ with tab_chat:
             st.markdown(msg["content"])
 
 # Микрофон
-_, col_mic, _ = st.columns([0.48, 0.04, 0.48])
+col_mic, _ = st.columns([0.12, 0.88])
 with col_mic:
     audio_bytes = audio_recorder(
         text="", recording_color="#e74c3c",
-        neutral_color="#888888", icon_size="sm",
+        neutral_color="#888888", icon_size="lg",
     )
 
 # Голосовой ввод
