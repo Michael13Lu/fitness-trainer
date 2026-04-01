@@ -414,34 +414,34 @@ with tab_chat:
                 st.image(msg["image"], width=200)
             st.markdown(msg["content"])
 
-# Микрофон
-col_mic, _ = st.columns([0.12, 0.88])
-with col_mic:
-    audio_bytes = audio_recorder(
-        text="", recording_color="#e74c3c",
-        neutral_color="#888888", icon_size="2x",
-    )
+    # Микрофон
+    col_mic, _ = st.columns([0.12, 0.88])
+    with col_mic:
+        audio_bytes = audio_recorder(
+            text="", recording_color="#e74c3c",
+            neutral_color="#888888", icon_size="2x",
+        )
 
-# Голосовой ввод
-if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.get("last_audio"):
-    st.session_state.last_audio = audio_bytes
-    with st.spinner(t(lang, "recognizing")):
-        voice_text = transcribe_audio(audio_bytes)
-    if voice_text:
-        with st.chat_message("user"):
-            st.markdown(f"🎙️ {voice_text}")
-        st.session_state.messages.append({"role": "user", "content": f"🎙️ {voice_text}"})
-        with st.chat_message("assistant"):
-            with st.spinner(t(lang, "thinking")):
-                response = chain.invoke(get_chain_input(voice_text))
-            st.markdown(response)
-        if voice_response:
-            speak(response)
-        st.session_state.history.add_user_message(voice_text)
-        st.session_state.history.add_ai_message(response)
-        save_message(name, "user", voice_text)
-        save_message(name, "assistant", response)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    # Голосовой ввод
+    if audio_bytes and len(audio_bytes) > 1000 and audio_bytes != st.session_state.get("last_audio"):
+        st.session_state.last_audio = audio_bytes
+        with st.spinner(t(lang, "recognizing")):
+            voice_text = transcribe_audio(audio_bytes)
+        if voice_text:
+            with st.chat_message("user"):
+                st.markdown(f"🎙️ {voice_text}")
+            st.session_state.messages.append({"role": "user", "content": f"🎙️ {voice_text}"})
+            with st.chat_message("assistant"):
+                with st.spinner(t(lang, "thinking")):
+                    response = chain.invoke(get_chain_input(voice_text))
+                st.markdown(response)
+            if voice_response:
+                speak(response)
+            st.session_state.history.add_user_message(voice_text)
+            st.session_state.history.add_ai_message(response)
+            save_message(name, "user", voice_text)
+            save_message(name, "assistant", response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
 # Текстовый ввод + файл
 msg = st.chat_input(
@@ -528,6 +528,11 @@ if st.session_state.get("detected_exercise", {}).get("exercise"):
 with tab_diary:
     st.subheader(t(lang, "record_workout"))
 
+    # Предзаполнение из голоса
+    _vp = st.session_state.pop("diary_voice_prefill", {})
+    if _vp:
+        st.info(f"🎙️ Распознано голосом: **{_vp.get('exercise', '')}** — проверь и нажми «Добавить»")
+
     # Название тренировки (хранится в session_state)
     if "workout_name" not in st.session_state:
         st.session_state.workout_name = ""
@@ -539,11 +544,15 @@ with tab_diary:
     )
     st.session_state.workout_name = w_name
 
+    _mg_voice = _vp.get("muscle_group", MUSCLE_GROUPS[0])
+    _mg_index = MUSCLE_GROUPS.index(_mg_voice) if _mg_voice in MUSCLE_GROUPS else 0
+
     col1, col2 = st.columns(2)
     with col1:
         w_date = st.date_input(t(lang, "date"), value=date.today())
-        w_exercise = st.text_input(t(lang, "exercise"), placeholder=t(lang, "exercise_placeholder"))
-        w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS)
+        w_exercise = st.text_input(t(lang, "exercise"), value=_vp.get("exercise", ""),
+                                   placeholder=t(lang, "exercise_placeholder"))
+        w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS, index=_mg_index)
     with col2:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
 
@@ -555,9 +564,12 @@ with tab_diary:
             w_distance = st.number_input("📏 Дистанция (км)", min_value=0.0, max_value=200.0, value=0.0, step=0.1)
             w_avg_hr = st.number_input("❤️ Средний пульс (уд/мин)", min_value=0, max_value=250, value=0)
         else:
-            w_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20, value=3)
-            w_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100, value=10)
-            w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0, value=0.0, step=2.5)
+            w_sets = st.number_input(t(lang, "sets"), min_value=1, max_value=20,
+                                     value=int(_vp.get("sets", 3)))
+            w_reps = st.number_input(t(lang, "reps"), min_value=1, max_value=100,
+                                     value=int(_vp.get("reps", 10)))
+            w_weight = st.number_input(t(lang, "weight_kg"), min_value=0.0, max_value=500.0,
+                                       value=float(_vp.get("weight", 0.0)), step=2.5)
 
     # Пульсовая зона (если кардио и пульс введён)
     if is_cardio and w_avg_hr > 0:
@@ -576,7 +588,8 @@ with tab_diary:
         colors = {1: "🟦", 2: "🟩", 3: "🟨", 4: "🟧", 5: "🟥"}
         st.info(f"{colors[zone]} **Зона {zone} — {zone_name}** ({pct:.0f}% от макс. пульса {max_hr})")
 
-    w_notes = st.text_input(t(lang, "notes"), placeholder=t(lang, "notes_placeholder"))
+    w_notes = st.text_input(t(lang, "notes"), value=_vp.get("notes", ""),
+                            placeholder=t(lang, "notes_placeholder"))
 
     col_add, col_del = st.columns([0.3, 0.7])
     with col_add:
@@ -601,11 +614,11 @@ with tab_diary:
 
     # Голосовой ввод упражнения
     st.caption(t(lang, "voice_add_exercise"))
-    _, _mic_col, _ = st.columns([0.45, 0.1, 0.45])
+    _mic_col, _ = st.columns([0.12, 0.88])
     with _mic_col:
         _diary_audio = audio_recorder(
             text="", recording_color="#e74c3c", neutral_color="#888888",
-            icon_size="sm", key="diary_mic",
+            icon_size="2x", key="diary_mic",
         )
     if _diary_audio and len(_diary_audio) > 1000 and _diary_audio != st.session_state.get("last_diary_audio"):
         st.session_state.last_diary_audio = _diary_audio
@@ -615,28 +628,28 @@ with tab_diary:
             st.info(f"🎙️ {_diary_voice}")
             with st.spinner(t(lang, "thinking")):
                 _parse_prompt = (
-                    f"Extract workout entry from: '{_diary_voice}'. "
-                    f"Return JSON: {{\"exercise\": \"\", \"muscle_group\": \"\", "
+                    f"Распознай упражнение из текста: '{_diary_voice}'. "
+                    f"Верни JSON: {{\"exercise\": \"\", \"muscle_group\": \"\", "
                     f"\"sets\": 0, \"reps\": 0, \"weight\": 0, \"notes\": \"\"}}. "
-                    f"muscle_group must be one of: {MUSCLE_GROUPS}. "
-                    f"Return only valid JSON, no explanation."
+                    f"muscle_group должна быть из списка: {MUSCLE_GROUPS}. "
+                    f"Верни только JSON, без объяснений."
                 )
                 _parsed_raw = llm_text.invoke(_parse_prompt).content.strip()
             try:
                 import re as _re
+                import json as _json
                 _json_match = _re.search(r'\{.*\}', _parsed_raw, _re.DOTALL)
                 if _json_match:
-                    import json as _json
                     _p = _json.loads(_json_match.group())
                     if _p.get("exercise"):
-                        add_exercise(name, str(w_date),
-                                     _p["exercise"],
-                                     _p.get("muscle_group", MUSCLE_GROUPS[0]),
-                                     int(_p.get("sets", 3)),
-                                     int(_p.get("reps", 10)),
-                                     float(_p.get("weight", 0)),
-                                     _p.get("notes", ""))
-                        st.success(f"{t(lang, 'recorded')}: {_p['exercise']}")
+                        st.session_state.diary_voice_prefill = {
+                            "exercise": _p["exercise"],
+                            "muscle_group": _p.get("muscle_group", MUSCLE_GROUPS[0]),
+                            "sets": int(_p.get("sets", 3)),
+                            "reps": int(_p.get("reps", 10)),
+                            "weight": float(_p.get("weight", 0)),
+                            "notes": _p.get("notes", ""),
+                        }
                         st.rerun()
             except Exception:
                 st.warning(f"Не смог распознать: {_diary_voice}")
