@@ -564,15 +564,6 @@ with tab_chat:
                 st.image(msg["image"], width=200)
             st.markdown(msg["content"])
 
-    # Прикрепить файл / фото
-    with st.expander("📎", expanded=False):
-        _uploaded = st.file_uploader(
-            "attach", type=["jpg", "jpeg", "png", "webp", "pdf", "csv"],
-            label_visibility="collapsed", key="_chat_file_widget"
-        )
-        if _uploaded:
-            st.session_state["_chat_upload_file"] = _uploaded
-
     # Микрофон
     col_mic, _ = st.columns([0.12, 0.88])
     with col_mic:
@@ -602,12 +593,16 @@ with tab_chat:
             save_message(name, "assistant", response)
             st.session_state.messages.append({"role": "assistant", "content": response})
 
-# Текстовый ввод
-msg = st.chat_input(t(lang, "chat_placeholder"))
+# Текстовый ввод + прикрепить файл
+msg = st.chat_input(
+    t(lang, "chat_placeholder"),
+    accept_file=True,
+    file_type=["jpg", "jpeg", "png", "webp", "pdf", "csv"],
+)
 
 if msg:
-    user_input = msg
-    attached = st.session_state.pop("_chat_upload_file", None)
+    user_input = msg.text or ""
+    attached = msg["files"][0] if msg["files"] else None
     is_image = attached and attached.type in ("image/jpeg", "image/png", "image/webp", "image/jpg")
     is_doc = attached and not is_image
 
