@@ -356,6 +356,34 @@ chain = prompt | llm_text | StrOutputParser()
 
 MUSCLE_GROUPS = t(lang, "muscle_groups")
 
+# Exercise catalog indexed by muscle group (same order as MUSCLE_GROUPS / translations)
+# 0-Chest 1-Back 2-Shoulders 3-Biceps 4-Triceps 5-Abs
+# 6-Quads 7-Hamstrings 8-Glutes 9-Calves 10-Cardio
+_EXERCISE_CATALOG: list[list[str]] = [
+    ["Bench Press", "Incline Bench Press", "Decline Bench Press",          # 0 Chest
+     "Dumbbell Fly", "Cable Crossover", "Push-ups", "Dips", "Pec Deck"],
+    ["Deadlift", "Pull-ups", "Lat Pulldown", "Barbell Row",                # 1 Back
+     "Cable Row", "Single-arm Row", "Face Pull", "Hyperextension", "T-bar Row"],
+    ["Overhead Press", "Dumbbell Shoulder Press", "Lateral Raise",         # 2 Shoulders
+     "Front Raise", "Arnold Press", "Rear Delt Fly", "Upright Row", "Shrugs"],
+    ["Bicep Curl", "Hammer Curl", "Preacher Curl",                         # 3 Biceps
+     "Cable Curl", "Concentration Curl", "Incline Dumbbell Curl"],
+    ["Tricep Pushdown", "Skull Crusher", "Overhead Tricep Extension",       # 4 Triceps
+     "Close-grip Bench Press", "Dips", "Kickback"],
+    ["Crunch", "Plank", "Leg Raise", "Russian Twist",                      # 5 Abs
+     "Mountain Climber", "Ab Rollout", "Hanging Knee Raise", "Cable Crunch"],
+    ["Squat", "Front Squat", "Leg Press", "Leg Extension",                 # 6 Quads
+     "Lunge", "Bulgarian Split Squat", "Hack Squat"],
+    ["Romanian Deadlift", "Leg Curl", "Stiff-leg Deadlift",                # 7 Hamstrings
+     "Good Morning", "Nordic Curl"],
+    ["Hip Thrust", "Glute Bridge", "Cable Kickback",                       # 8 Glutes
+     "Abductor Machine", "Step-up", "Sumo Squat"],
+    ["Standing Calf Raise", "Seated Calf Raise",                           # 9 Calves
+     "Donkey Calf Raise", "Leg Press Calf Raise"],
+    ["Treadmill", "Cycling", "Rowing Machine", "Elliptical",               # 10 Cardio
+     "Jump Rope", "HIIT", "Swimming", "Stair Climber"],
+]
+
 # Keywords → muscle group index (sorted longest-first to avoid false prefix matches)
 _EXERCISE_MUSCLE_MAP = sorted({
     # Грудь (0)
@@ -1351,32 +1379,86 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
             rest_toggle = st.checkbox(f"💤 {rest_label}", value=is_rest_e,
                                       key=f"rest_chk_{wi}_{edi}")
             if not rest_toggle:
-                exs_text = st.text_area(
-                    "Упражнения (каждое с новой строки):",
-                    value="\n".join(day_data_e.get("exercises", [])),
-                    height=150,
-                    key=f"exs_area_{wi}_{edi}",
-                )
+                _ekey = f"edit_exs_{wi}_{edi}"
+                if _ekey not in st.session_state:
+                    st.session_state[_ekey] = list(day_data_e.get("exercises", []))
+                _exs = st.session_state[_ekey]
+                _mgs = t(lang_code, "muscle_groups")
+
+                # ── Current exercises list ──────────────────────────
+                if _exs:
+                    for _ei, _ex in enumerate(_exs):
+                        _ca, _cb = st.columns([0.87, 0.13])
+                        with _ca:
+                            st.markdown(f"• {_ex}")
+                        with _cb:
+                            if st.button("❌", key=f"rm_{wi}_{edi}_{_ei}",
+                                         use_container_width=True):
+                                st.session_state[_ekey].pop(_ei)
+                                st.rerun()
+                else:
+                    st.caption("—")
+
+                st.markdown("---")
+
+                # ── Add from catalog ────────────────────────────────
+                _cA, _cB, _cC = st.columns([0.30, 0.52, 0.18])
+                with _cA:
+                    _mg_i = st.selectbox(
+                        "mg", range(len(_mgs)),
+                        format_func=lambda i: _mgs[i],
+                        label_visibility="collapsed",
+                        key=f"mg_{wi}_{edi}",
+                    )
+                with _cB:
+                    _cat_list = _EXERCISE_CATALOG[_mg_i] if _mg_i < len(_EXERCISE_CATALOG) else []
+                    _ex_pick = st.selectbox(
+                        "ex", _cat_list,
+                        label_visibility="collapsed",
+                        key=f"exp_{wi}_{edi}",
+                    )
+                with _cC:
+                    if st.button("➕", key=f"addc_{wi}_{edi}",
+                                 use_container_width=True) and _ex_pick:
+                        if _ex_pick not in _exs:
+                            st.session_state[_ekey].append(_ex_pick)
+                        st.rerun()
+
+                # ── Add custom exercise ─────────────────────────────
+                _cX, _cY = st.columns([0.82, 0.18])
+                with _cX:
+                    _custom = st.text_input(
+                        "own", label_visibility="collapsed",
+                        placeholder="Bench Press 3x10 @ 80 kg",
+                        key=f"cust_{wi}_{edi}",
+                    )
+                with _cY:
+                    if st.button("➕ +", key=f"addx_{wi}_{edi}",
+                                 use_container_width=True) and _custom.strip():
+                        st.session_state[_ekey].append(_custom.strip())
+                        st.session_state[f"cust_{wi}_{edi}"] = ""
+                        st.rerun()
+
             col_s, col_c = st.columns(2)
             with col_s:
                 if st.button(f"💾 {t(lang_code, 'btn_save')}", key=f"save_{wi}_{edi}",
                              use_container_width=True):
-                    # Update cache
                     if rest_toggle:
                         weeks[wi]["days"][edi] = {"day": edi, "exercises": [], "rest": True}
                     else:
-                        new_exs = [l.strip() for l in exs_text.split("\n") if l.strip()]
-                        weeks[wi]["days"][edi] = {"day": edi, "exercises": new_exs, "rest": False}
+                        _saved = st.session_state.get(f"edit_exs_{wi}_{edi}", [])
+                        weeks[wi]["days"][edi] = {"day": edi, "exercises": _saved, "rest": False}
                     st.session_state[cache_key] = weeks
-                    # Save to DB
                     new_text = _weeks_to_text(weeks, day_labels, rest_label, week_label)
                     update_program_text(prog_id, new_text)
                     st.session_state.pop("prog_editing", None)
+                    st.session_state.pop(f"edit_exs_{wi}_{edi}", None)
                     st.success(t(lang_code, "program_saved"))
                     st.rerun()
             with col_c:
                 if st.button("✖ Отмена", key=f"cancel_{wi}_{edi}", use_container_width=True):
                     st.session_state.pop("prog_editing", None)
+                    st.session_state.pop(f"edit_exs_{wi}_{edi}", None)
                     st.rerun()
             st.divider()
 
