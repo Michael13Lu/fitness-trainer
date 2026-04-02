@@ -457,6 +457,7 @@ def get_system_text():
         name=name, age=age, weight=weight, height=height,
         goal=goal, level=level, trainer_style=trainer_style,
         weight_goal_info=_weight_goal_info,
+        active_program_info=_prog_info,
         lang_instruction=t(lang, "system_prompt_lang")
     )
 
