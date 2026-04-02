@@ -196,13 +196,19 @@ with st.sidebar:
         _exercises_list = st.session_state.get("sidebar_exercises", [])
         if _exercises_list:
             _suffix = t(lang, "video_search_suffix")
+            # Если пришли с клика на упражнение — сразу выбираем его
+            _default_ex = st.session_state.pop("sidebar_video_exercise", None)
+            _default_idx = (_exercises_list.index(_default_ex)
+                            if _default_ex and _default_ex in _exercises_list else 0)
             _selected_ex = st.selectbox(
-                "📋", _exercises_list, label_visibility="collapsed"
+                "📋", _exercises_list, index=_default_idx,
+                label_visibility="collapsed"
             )
-            _query = f"{_selected_ex} {_suffix}".replace(" ", "+")
+            # Название упражнения без весов/подходов для поиска
+            _ex_name = " ".join(_selected_ex.split()[:3])
+            _query = f"{_ex_name} {_suffix}".replace(" ", "+")
             _search_url = f"https://www.youtube.com/results?search_query={_query}"
-
-            # Встраиваем поиск YouTube через iframe
+            st.caption(f"🔍 {_ex_name}")
             components.html(f"""
                 <iframe
                     src="https://www.youtube.com/embed?listType=search&list={_query}"
@@ -214,12 +220,12 @@ with st.sidebar:
                 <div style="margin-top:6px; font-size:12px;">
                     <a href="{_search_url}" target="_blank"
                        style="color:#e74c3c; text-decoration:none;">
-                        🔍 Все результаты на YouTube
+                        🔍 Все результаты на YouTube →
                     </a>
                 </div>
-            """, height=260)
+            """, height=265)
         else:
-            st.caption("Спроси тренера составить программу — здесь появятся видео по упражнениям.")
+            st.caption("Нажми ▶ на упражнении в программе — здесь появится видео.")
 
 # Читаем профиль из session_state (всегда доступны)
 name = _prof["name"]
@@ -1285,6 +1291,17 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                     f"{items_html}</div>",
                     unsafe_allow_html=True,
                 )
+                # Кнопки для каждого упражнения → видео в сайдбаре
+                if not is_rest:
+                    for ei, ex in enumerate(exs):
+                        ex_short = ex.split(" ")[0:3]
+                        ex_label = " ".join(ex_short)[:20]
+                        if st.button(f"▶ {ex_label}", key=f"vid_{wi}_{di}_{ei}",
+                                     use_container_width=True):
+                            st.session_state["sidebar_video_exercise"] = ex
+                            st.session_state.sidebar_section = "video"
+                            st.session_state["sidebar_exercises"] = [ex]
+                            st.rerun()
                 if st.button("✏️", key=f"edit_{wi}_{di}", use_container_width=True):
                     st.session_state["prog_editing"] = (wi, di)
                     st.rerun()
@@ -1416,6 +1433,65 @@ with tab_program:
             save_program(name, _title_resp, _gen_resp)
             st.success(f"💾 {t(lang, 'program_saved')}: **{_title_resp}**")
             st.rerun()
+
+    # ── Чат с тренером в контексте программы ────────────────
+    if active:
+        st.divider()
+        st.markdown(f"**🤖 {t(lang, 'thinking').replace('...', '')} — {t(lang, 'tab_program')}**")
+
+        # История чата программы
+        if "prog_chat_messages" not in st.session_state:
+            st.session_state.prog_chat_messages = []
+        for _pm in st.session_state.prog_chat_messages:
+            with st.chat_message(_pm["role"]):
+                st.markdown(_pm["content"])
+
+        _prog_input = st.chat_input(t(lang, "chat_placeholder"), key="prog_chat_input")
+        if _prog_input:
+            _active_now = get_active_program(name)
+            _prog_ctx = _active_now["raw_text"] if _active_now else ""
+            _diary_ctx = get_workouts_as_text(name, limit=20)
+            _prog_prompt = (
+                f"Текущая программа тренировок пользователя:\n{_prog_ctx}\n\n"
+                f"Дневник тренировок:\n{_diary_ctx}\n\n"
+                f"Сообщение пользователя: {_prog_input}\n\n"
+                f"Если пользователь хочет изменить программу — предложи ПОЛНУЮ обновлённую версию "
+                f"и добавь в конце тег [UPDATED_PROGRAM] чтобы её можно было сохранить."
+            )
+            with st.chat_message("user"):
+                st.markdown(_prog_input)
+            st.session_state.prog_chat_messages.append({"role": "user", "content": _prog_input})
+
+            with st.chat_message("assistant"):
+                with st.spinner(t(lang, "thinking")):
+                    _prog_resp = chain.invoke(get_chain_input(_prog_prompt))
+                # Если тренер предлагает обновлённую программу
+                if "[UPDATED_PROGRAM]" in _prog_resp:
+                    _clean_resp = _prog_resp.replace("[UPDATED_PROGRAM]", "").strip()
+                    st.markdown(_clean_resp)
+                    if st.button(f"💾 {t(lang, 'program_saved')} ← применить",
+                                 key="apply_prog_chat", use_container_width=True):
+                        update_program_text(active["id"], _clean_resp)
+                        st.session_state.pop(f"prog_calendar_{active['id']}", None)
+                        st.success(t(lang, "program_saved"))
+                        st.rerun()
+                else:
+                    st.markdown(_prog_resp)
+                    _clean_resp = _prog_resp
+            st.session_state.prog_chat_messages.append({"role": "assistant", "content": _clean_resp})
+
+            # Видео по упражнениям если упомянуты
+            try:
+                import re as _re4, json as _json4
+                _ex_p = (f"List exercise names from this text as JSON array of strings. "
+                         f"Empty array [] if none. Only JSON:\n{_prog_resp[:1000]}")
+                _ex_r = llm_text.invoke(_ex_p).content.strip()
+                _ex_m = _re4.search(r'\[.*?\]', _ex_r, _re4.DOTALL)
+                _found = _json4.loads(_ex_m.group()) if _ex_m else []
+            except Exception:
+                _found = []
+            if _found:
+                st.session_state.sidebar_exercises = _found[:8]
 
     # История программ
     if len(all_progs) > 1:
