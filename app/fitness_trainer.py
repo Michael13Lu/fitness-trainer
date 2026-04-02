@@ -17,6 +17,8 @@ from audio_recorder_streamlit import audio_recorder
 from groq import Groq
 from memory_store import load_messages, save_message, clear_history, save_language, load_language, save_profile, load_profile
 from muscle_diagram import get_muscle_html
+from program_store import (save_program, get_active_program, get_all_programs,
+                           activate_program, update_program_text)
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise,
                            get_workouts_by_date, update_exercise)
@@ -332,6 +334,7 @@ Client info:
 - Fitness level: {level}
 - Your communication style: {trainer_style}
 {weight_goal_info}
+{active_program_info}
 Give specific advice on training and nutrition based on the client's profile.
 When building a program, respect the realistic weight loss/gain rate (~0.5 kg/week for fat loss).
 If the client's target is too aggressive, gently explain realistic expectations.
@@ -409,10 +412,18 @@ def _on_exercise_change():
 
 
 def get_chain_input(user_input: str) -> dict:
+    _prog = get_active_program(name)
+    if _prog:
+        _prog_info = (f"Current training program «{_prog['title']}» "
+                      f"(saved {_prog['updated_at'][:10]}):\n{_prog['raw_text'][:1500]}\n"
+                      f"Take this program into account when giving advice and corrections.")
+    else:
+        _prog_info = ""
     return {
         "name": name, "age": age, "weight": weight, "height": height,
         "goal": goal, "level": level, "trainer_style": trainer_style,
         "weight_goal_info": _weight_goal_info,
+        "active_program_info": _prog_info,
         "lang_instruction": t(lang, "system_prompt_lang"),
         "history": st.session_state.history.messages,
         "input": user_input,
@@ -498,8 +509,9 @@ If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}
 # ============================================================
 # ВКЛАДКИ
 # ============================================================
-tab_chat, tab_diary, tab_food, tab_analysis = st.tabs([
-    t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"), t(lang, "tab_analysis")
+tab_chat, tab_diary, tab_food, tab_analysis, tab_program = st.tabs([
+    t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"),
+    t(lang, "tab_analysis"), t(lang, "tab_program")
 ])
 
 # ============================================================
@@ -600,6 +612,22 @@ if msg:
         if _exercises_found:
             st.session_state.sidebar_exercises = _exercises_found[:8]
             st.info(f"{t(lang, 'video_tutorials')}: нажми 🎬 в боковой панели", icon="🎬")
+
+        # Автосохранение программы если тренер её составил
+        _prog_keywords = ["день 1", "день 2", "day 1", "day 2", "week 1", "неделя",
+                          "программа", "program", "план тренировок", "training plan",
+                          "пн:", "вт:", "ср:", "чт:", "пт:", "mon:", "tue:", "wed:", "thu:", "fri:"]
+        if any(kw in response.lower() for kw in _prog_keywords) and len(response) > 300:
+            _prog_title_prompt = (
+                f"Придумай короткое название (3-5 слов) для этой программы тренировок. "
+                f"Только название, без кавычек и объяснений:\n\n{response[:500]}"
+            )
+            try:
+                _prog_title = llm_text.invoke(_prog_title_prompt).content.strip()[:60]
+            except Exception:
+                _prog_title = "Программа тренировок"
+            save_program(name, _prog_title, response)
+            st.success(f"💾 {t(lang, 'program_saved')}: **{_prog_title}**")
 
     if voice_response:
         speak(response)
@@ -1157,3 +1185,69 @@ with tab_analysis:
             st.markdown(response)
         if voice_response:
             speak(response)
+
+# ============================================================
+# ВКЛАДКА 5: ПРОГРАММА ТРЕНИРОВОК
+# ============================================================
+with tab_program:
+    st.subheader(t(lang, "tab_program"))
+
+    active = get_active_program(name)
+    all_progs = get_all_programs(name)
+
+    if active:
+        st.success(f"✅ {t(lang, 'active_program')}: **{active['title']}**  "
+                   f"— {active['updated_at'][:10]}")
+        # Редактируемый текст программы
+        edited_text = st.text_area(
+            t(lang, "program_text"),
+            value=active["raw_text"],
+            height=420,
+            key="program_edit_area",
+        )
+        col_save, col_ask = st.columns(2)
+        with col_save:
+            if st.button(f"💾 {t(lang, 'btn_save')}", use_container_width=True):
+                update_program_text(active["id"], edited_text)
+                st.success(t(lang, "program_saved"))
+                st.rerun()
+        with col_ask:
+            if st.button(f"🤖 {t(lang, 'program_ask_correction')}", use_container_width=True):
+                _correction_prompt = (
+                    f"Вот моя текущая программа тренировок:\n\n{edited_text}\n\n"
+                    f"Проанализируй её с учётом моих данных и дневника тренировок. "
+                    f"Предложи конкретные корректировки."
+                )
+                with st.chat_message("assistant"):
+                    with st.spinner(t(lang, "thinking")):
+                        _corr_resp = chain.invoke(get_chain_input(_correction_prompt))
+                    st.markdown(_corr_resp)
+    else:
+        st.info(t(lang, "no_program"))
+        if st.button(f"🤖 {t(lang, 'program_generate')}", use_container_width=True):
+            _gen_prompt = (
+                f"Составь мне персональную программу тренировок на 4 недели. "
+                f"Учти мои данные, цель и уровень подготовки. "
+                f"Структурируй по дням недели с конкретными упражнениями, "
+                f"подходами, повторениями и весом."
+            )
+            with st.chat_message("assistant"):
+                with st.spinner(t(lang, "thinking")):
+                    _gen_resp = chain.invoke(get_chain_input(_gen_prompt))
+                st.markdown(_gen_resp)
+
+    # История программ
+    if len(all_progs) > 1:
+        st.divider()
+        st.subheader(t(lang, "program_history"))
+        for p in all_progs:
+            _active_mark = "✅ " if p["is_active"] else ""
+            col_lbl, col_btn = st.columns([0.75, 0.25])
+            with col_lbl:
+                st.markdown(f"{_active_mark}**{p['title']}** — {p['created_at'][:10]}")
+            with col_btn:
+                if not p["is_active"]:
+                    if st.button(t(lang, "program_activate"), key=f"act_{p['id']}",
+                                 use_container_width=True):
+                        activate_program(name, p["id"])
+                        st.rerun()
