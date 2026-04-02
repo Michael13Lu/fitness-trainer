@@ -1233,26 +1233,43 @@ Program text:
     return []
 
 
-def _render_program_calendar(weeks: list, lang_code: str):
-    day_labels = t(lang_code, "week_days")   # ["Пн","Вт",...]
+def _weeks_to_text(weeks: list, day_labels: list, rest_label: str, week_label: str) -> str:
+    """Convert structured weeks JSON back to readable text for DB storage."""
+    lines = []
+    for week in weeks:
+        lines.append(f"{week_label} {week.get('week', 1)}:")
+        for day in week.get("days", []):
+            i = day.get("day", 0)
+            label = day_labels[i] if i < len(day_labels) else str(i)
+            if day.get("rest") or not day.get("exercises"):
+                lines.append(f"  {label}: {rest_label}")
+            else:
+                exs = ", ".join(day.get("exercises", []))
+                lines.append(f"  {label}: {exs}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_key: str):
+    day_labels = t(lang_code, "week_days")
     rest_label = t(lang_code, "rest_day")
     week_label = t(lang_code, "program_week")
+    editing    = st.session_state.get("prog_editing")  # (week_idx, day_idx) or None
 
-    for week in weeks:
-        st.markdown(f"#### {week_label} {week.get('week', 1)}")
+    for wi, week in enumerate(weeks):
+        st.markdown(f"#### {week_label} {week.get('week', wi + 1)}")
         days = week.get("days", [])
-        # Ensure exactly 7 days
         while len(days) < 7:
             days.append({"day": len(days), "exercises": [], "rest": True})
 
         cols = st.columns(7)
-        for i, col in enumerate(cols):
+        for di, col in enumerate(cols):
             with col:
-                day_data = days[i]
-                is_rest = day_data.get("rest", True) or not day_data.get("exercises")
-                bg      = "#f5f5f5" if is_rest else "#e8f4fd"
-                border  = "#ccc"    if is_rest else "#3498db"
-                exs     = day_data.get("exercises", [])
+                day_data = days[di]
+                is_rest  = day_data.get("rest", True) or not day_data.get("exercises")
+                bg       = "#f5f5f5" if is_rest else "#e8f4fd"
+                border   = "#ccc"    if is_rest else "#3498db"
+                exs      = day_data.get("exercises", [])
                 items_html = "".join(
                     f"<div style='font-size:11px;margin-top:4px;padding:3px 5px;"
                     f"background:#fff;border-radius:4px;"
@@ -1261,14 +1278,56 @@ def _render_program_calendar(weeks: list, lang_code: str):
                 ) if not is_rest else (
                     f"<div style='color:#aaa;font-size:12px;margin-top:8px'>💤 {rest_label}</div>"
                 )
-                html = (
+                st.markdown(
                     f"<div style='background:{bg};border-radius:8px;padding:8px;"
-                    f"min-height:130px;border-top:3px solid {border}'>"
-                    f"<b style='font-size:12px;color:#333'>{day_labels[i]}</b>"
-                    f"{items_html}"
-                    f"</div>"
+                    f"min-height:110px;border-top:3px solid {border}'>"
+                    f"<b style='font-size:12px;color:#333'>{day_labels[di]}</b>"
+                    f"{items_html}</div>",
+                    unsafe_allow_html=True,
                 )
-                st.markdown(html, unsafe_allow_html=True)
+                if st.button("✏️", key=f"edit_{wi}_{di}", use_container_width=True):
+                    st.session_state["prog_editing"] = (wi, di)
+                    st.rerun()
+
+        # Edit form — показываем под строкой недели если выбран день этой недели
+        if editing and editing[0] == wi:
+            _, edi = editing
+            day_data_e = days[edi]
+            is_rest_e  = day_data_e.get("rest", True) or not day_data_e.get("exercises")
+            st.divider()
+            st.markdown(f"**✏️ {week_label} {week.get('week', wi+1)}, {day_labels[edi]}**")
+
+            rest_toggle = st.checkbox(f"💤 {rest_label}", value=is_rest_e,
+                                      key=f"rest_chk_{wi}_{edi}")
+            if not rest_toggle:
+                exs_text = st.text_area(
+                    "Упражнения (каждое с новой строки):",
+                    value="\n".join(day_data_e.get("exercises", [])),
+                    height=150,
+                    key=f"exs_area_{wi}_{edi}",
+                )
+            col_s, col_c = st.columns(2)
+            with col_s:
+                if st.button(f"💾 {t(lang_code, 'btn_save')}", key=f"save_{wi}_{edi}",
+                             use_container_width=True):
+                    # Update cache
+                    if rest_toggle:
+                        weeks[wi]["days"][edi] = {"day": edi, "exercises": [], "rest": True}
+                    else:
+                        new_exs = [l.strip() for l in exs_text.split("\n") if l.strip()]
+                        weeks[wi]["days"][edi] = {"day": edi, "exercises": new_exs, "rest": False}
+                    st.session_state[cache_key] = weeks
+                    # Save to DB
+                    new_text = _weeks_to_text(weeks, day_labels, rest_label, week_label)
+                    update_program_text(prog_id, new_text)
+                    st.session_state.pop("prog_editing", None)
+                    st.success(t(lang_code, "program_saved"))
+                    st.rerun()
+            with col_c:
+                if st.button("✖ Отмена", key=f"cancel_{wi}_{edi}", use_container_width=True):
+                    st.session_state.pop("prog_editing", None)
+                    st.rerun()
+            st.divider()
 
 
 with tab_program:
@@ -1295,7 +1354,7 @@ with tab_program:
                     st.session_state[_cache_key] = _parse_program_to_calendar(active["raw_text"])
             _weeks = st.session_state[_cache_key]
             if _weeks:
-                _render_program_calendar(_weeks, lang)
+                _render_program_calendar(_weeks, lang, active["id"], _cache_key)
             else:
                 st.warning("Не удалось распознать структуру программы. Переключись на режим 'Текст'.")
 
