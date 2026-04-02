@@ -1191,17 +1191,40 @@ with tab_analysis:
 # ============================================================
 def _parse_program_to_calendar(program_text: str) -> list[dict]:
     """Ask LLM to parse program into weeks × days structure."""
-    _prompt = (
-        "Разбери следующую программу тренировок на недели и дни. "
-        "Верни JSON-массив недель. Каждая неделя — объект с ключом 'week' (номер) "
-        "и 'days' — массив из 7 элементов (Пн..Вс). "
-        "Каждый день: {'day': 'Пн', 'exercises': ['Упражнение 1 — 3×10', ...]} "
-        "или {'day': 'Пн', 'exercises': [], 'rest': true} если день отдыха. "
-        "Только JSON, без объяснений.\n\n" + program_text[:3000]
-    )
+    _prompt = f"""You are a JSON converter. Parse this training program into structured JSON.
+
+Return ONLY a valid JSON array with this exact structure:
+[
+  {{
+    "week": 1,
+    "days": [
+      {{"day": 0, "label": "Monday", "exercises": ["Bench press 3x10", "Push-ups 3x15"], "rest": false}},
+      {{"day": 1, "label": "Tuesday", "exercises": [], "rest": true}},
+      {{"day": 2, "label": "Wednesday", "exercises": ["Squats 4x8", "Lunges 3x12"], "rest": false}},
+      {{"day": 3, "label": "Thursday", "exercises": [], "rest": true}},
+      {{"day": 4, "label": "Friday", "exercises": ["Pull-ups 3x8", "Rows 3x10"], "rest": false}},
+      {{"day": 5, "label": "Saturday", "exercises": [], "rest": true}},
+      {{"day": 6, "label": "Sunday", "exercises": [], "rest": true}}
+    ]
+  }}
+]
+
+Rules:
+- days array must always have exactly 7 elements (Mon=0 to Sun=6)
+- exercises: short strings like "Exercise name Nsets x Nreps"
+- rest: true if no training that day
+- If program has no explicit weeks, treat it as week 1
+- Output ONLY the JSON array, no markdown, no explanation
+
+Program text:
+{program_text[:3000]}"""
+
     try:
         import re as _re3, json as _json3
         _raw = llm_text.invoke(_prompt).content.strip()
+        # Strip markdown code blocks if present
+        _raw = _re3.sub(r'^```(?:json)?\s*', '', _raw)
+        _raw = _re3.sub(r'\s*```$', '', _raw)
         _m = _re3.search(r'\[.*\]', _raw, _re3.DOTALL)
         if _m:
             return _json3.loads(_m.group())
@@ -1211,40 +1234,41 @@ def _parse_program_to_calendar(program_text: str) -> list[dict]:
 
 
 def _render_program_calendar(weeks: list, lang_code: str):
-    day_labels = t(lang_code, "week_days")  # Пн..Вс
+    day_labels = t(lang_code, "week_days")   # ["Пн","Вт",...]
     rest_label = t(lang_code, "rest_day")
     week_label = t(lang_code, "program_week")
 
     for week in weeks:
-        st.markdown(f"#### {week_label} {week.get('week', '')}")
-        cols = st.columns(7)
+        st.markdown(f"#### {week_label} {week.get('week', 1)}")
         days = week.get("days", [])
+        # Ensure exactly 7 days
+        while len(days) < 7:
+            days.append({"day": len(days), "exercises": [], "rest": True})
+
+        cols = st.columns(7)
         for i, col in enumerate(cols):
             with col:
-                day_data = days[i] if i < len(days) else {}
-                is_rest = day_data.get("rest", False) or not day_data.get("exercises")
-                st.markdown(
-                    f"<div style='background:{'#f0f0f0' if is_rest else '#e8f4fd'};"
-                    f"border-radius:8px;padding:8px;min-height:120px;"
-                    f"border-top:3px solid {'#ccc' if is_rest else '#3498db'}'>"
-                    f"<b style='font-size:13px'>{day_labels[i]}</b><br>",
-                    unsafe_allow_html=True,
+                day_data = days[i]
+                is_rest = day_data.get("rest", True) or not day_data.get("exercises")
+                bg      = "#f5f5f5" if is_rest else "#e8f4fd"
+                border  = "#ccc"    if is_rest else "#3498db"
+                exs     = day_data.get("exercises", [])
+                items_html = "".join(
+                    f"<div style='font-size:11px;margin-top:4px;padding:3px 5px;"
+                    f"background:#fff;border-radius:4px;"
+                    f"border-left:2px solid #3498db;word-break:break-word'>• {ex}</div>"
+                    for ex in exs
+                ) if not is_rest else (
+                    f"<div style='color:#aaa;font-size:12px;margin-top:8px'>💤 {rest_label}</div>"
                 )
-                if is_rest:
-                    st.markdown(
-                        f"<div style='color:#999;font-size:12px;margin-top:6px'>"
-                        f"💤 {rest_label}</div></div>",
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    exs = day_data.get("exercises", [])
-                    items = "".join(
-                        f"<div style='font-size:11px;margin-top:4px;"
-                        f"padding:3px 5px;background:#fff;border-radius:4px;"
-                        f"border-left:2px solid #3498db'>• {ex}</div>"
-                        for ex in exs
-                    )
-                    st.markdown(items + "</div>", unsafe_allow_html=True)
+                html = (
+                    f"<div style='background:{bg};border-radius:8px;padding:8px;"
+                    f"min-height:130px;border-top:3px solid {border}'>"
+                    f"<b style='font-size:12px;color:#333'>{day_labels[i]}</b>"
+                    f"{items_html}"
+                    f"</div>"
+                )
+                st.markdown(html, unsafe_allow_html=True)
 
 
 with tab_program:
