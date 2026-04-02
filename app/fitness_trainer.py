@@ -453,6 +453,11 @@ def transcribe_audio(audio_bytes: bytes) -> str:
 
 
 def get_system_text():
+    _prog = get_active_program(name)
+    _prog_info = (f"Current training program «{_prog['title']}» "
+                  f"(saved {_prog['updated_at'][:10]}):\n{_prog['raw_text'][:1500]}\n"
+                  f"Take this program into account when giving advice and corrections."
+                  if _prog else "")
     return system_prompt.format(
         name=name, age=age, weight=weight, height=height,
         goal=goal, level=level, trainer_style=trainer_style,
