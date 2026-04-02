@@ -1300,11 +1300,15 @@ def _weeks_to_text(weeks: list, day_labels: list, rest_label: str, week_label: s
     return "\n".join(lines)
 
 
+_SUNDAY_FIRST_LANGS = {"he"}
+
 def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_key: str):
     day_labels = t(lang_code, "week_days")
     rest_label = t(lang_code, "rest_day")
     week_label = t(lang_code, "program_week")
     editing    = st.session_state.get("prog_editing")  # (week_idx, day_idx) or None
+    # Sun-first locales display order: Sun(6), Mon(0)..Sat(5)
+    day_order = [6, 0, 1, 2, 3, 4, 5] if lang_code in _SUNDAY_FIRST_LANGS else list(range(7))
 
     for wi, week in enumerate(weeks):
         st.markdown(f"#### {week_label} {week.get('week', wi + 1)}")
@@ -1315,7 +1319,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
         cols = st.columns(7)
         for di, col in enumerate(cols):
             with col:
-                day_data = days[di]
+                day_data = days[day_order[di]]
                 is_rest  = day_data.get("rest", True) or not day_data.get("exercises")
                 bg       = "#f5f5f5" if is_rest else "#e8f4fd"
                 border   = "#ccc"    if is_rest else "#3498db"
@@ -1347,7 +1351,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                             st.session_state["sidebar_exercises"] = [ex]
                             st.rerun()
                 if st.button("✏️", key=f"edit_{wi}_{di}", use_container_width=True):
-                    st.session_state["prog_editing"] = (wi, di)
+                    st.session_state["prog_editing"] = (wi, day_order[di])
                     st.rerun()
 
         # Edit form — показываем под строкой недели если выбран день этой недели
@@ -1356,7 +1360,8 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
             day_data_e = days[edi]
             is_rest_e  = day_data_e.get("rest", True) or not day_data_e.get("exercises")
             st.divider()
-            st.markdown(f"**✏️ {week_label} {week.get('week', wi+1)}, {day_labels[edi]}**")
+            _edi_label = day_labels[day_order.index(edi)]
+            st.markdown(f"**✏️ {week_label} {week.get('week', wi+1)}, {_edi_label}**")
 
             rest_toggle = st.checkbox(f"💤 {rest_label}", value=is_rest_e,
                                       key=f"rest_chk_{wi}_{edi}")
