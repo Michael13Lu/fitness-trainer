@@ -117,6 +117,7 @@ T = {
         "program_generate": "Составить программу автоматически",
         "program_history": "История программ",
         "program_activate": "Активировать",
+        "program_chat_hint": "Для обсуждения программы напиши тренеру в чате — он знает твою текущую программу",
         "system_prompt_lang": "Отвечай на русском языке.",
     },
     "en": {
@@ -219,6 +220,7 @@ T = {
         "program_generate": "Generate program automatically",
         "program_history": "Program history",
         "program_activate": "Activate",
+        "program_chat_hint": "To discuss your program, message your trainer in the Chat tab — they know your current program",
         "system_prompt_lang": "Always respond in English.",
     },
     "es": {
@@ -321,6 +323,7 @@ T = {
         "program_generate": "Generar programa automáticamente",
         "program_history": "Historial de programas",
         "program_activate": "Activar",
+        "program_chat_hint": "Para hablar sobre tu programa, escríbele al entrenador en la pestaña Chat — conoce tu programa actual",
         "system_prompt_lang": "Responde siempre en español.",
     },
     "de": {
@@ -423,6 +426,7 @@ T = {
         "program_generate": "Programm automatisch generieren",
         "program_history": "Programmhistorie",
         "program_activate": "Aktivieren",
+        "program_chat_hint": "Um dein Programm zu besprechen, schreib dem Trainer im Chat-Tab — er kennt dein aktuelles Programm",
         "system_prompt_lang": "Antworte immer auf Deutsch.",
     },
     "fr": {
@@ -525,6 +529,7 @@ T = {
         "program_generate": "Générer le programme automatiquement",
         "program_history": "Historique des programmes",
         "program_activate": "Activer",
+        "program_chat_hint": "Pour discuter de votre programme, écrivez à votre coach dans l'onglet Chat — il connaît votre programme actuel",
         "system_prompt_lang": "Réponds toujours en français.",
     },
     "he": {
@@ -627,6 +632,7 @@ T = {
         "program_generate": "צור תוכנית אוטומטית",
         "program_history": "היסטוריית תוכניות",
         "program_activate": "הפעל",
+        "program_chat_hint": "כדי לדון בתוכנית שלך, שלח הודעה למאמן בלשונית הצ'אט — הוא מכיר את התוכנית הנוכחית שלך",
         "system_prompt_lang": "ענה תמיד בעברית.",
     },
 }
