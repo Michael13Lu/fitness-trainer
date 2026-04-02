@@ -28,6 +28,7 @@ import importlib
 import translations as _translations_mod
 importlib.reload(_translations_mod)
 from translations import LANGUAGES, t
+from exercise_catalog import get_catalog
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
 from googleapiclient.discovery import build as gcal_build
@@ -356,33 +357,8 @@ chain = prompt | llm_text | StrOutputParser()
 
 MUSCLE_GROUPS = t(lang, "muscle_groups")
 
-# Exercise catalog indexed by muscle group (same order as MUSCLE_GROUPS / translations)
-# 0-Chest 1-Back 2-Shoulders 3-Biceps 4-Triceps 5-Abs
-# 6-Quads 7-Hamstrings 8-Glutes 9-Calves 10-Cardio
-_EXERCISE_CATALOG: list[list[str]] = [
-    ["Bench Press", "Incline Bench Press", "Decline Bench Press",          # 0 Chest
-     "Dumbbell Fly", "Cable Crossover", "Push-ups", "Dips", "Pec Deck"],
-    ["Deadlift", "Pull-ups", "Lat Pulldown", "Barbell Row",                # 1 Back
-     "Cable Row", "Single-arm Row", "Face Pull", "Hyperextension", "T-bar Row"],
-    ["Overhead Press", "Dumbbell Shoulder Press", "Lateral Raise",         # 2 Shoulders
-     "Front Raise", "Arnold Press", "Rear Delt Fly", "Upright Row", "Shrugs"],
-    ["Bicep Curl", "Hammer Curl", "Preacher Curl",                         # 3 Biceps
-     "Cable Curl", "Concentration Curl", "Incline Dumbbell Curl"],
-    ["Tricep Pushdown", "Skull Crusher", "Overhead Tricep Extension",       # 4 Triceps
-     "Close-grip Bench Press", "Dips", "Kickback"],
-    ["Crunch", "Plank", "Leg Raise", "Russian Twist",                      # 5 Abs
-     "Mountain Climber", "Ab Rollout", "Hanging Knee Raise", "Cable Crunch"],
-    ["Squat", "Front Squat", "Leg Press", "Leg Extension",                 # 6 Quads
-     "Lunge", "Bulgarian Split Squat", "Hack Squat"],
-    ["Romanian Deadlift", "Leg Curl", "Stiff-leg Deadlift",                # 7 Hamstrings
-     "Good Morning", "Nordic Curl"],
-    ["Hip Thrust", "Glute Bridge", "Cable Kickback",                       # 8 Glutes
-     "Abductor Machine", "Step-up", "Sumo Squat"],
-    ["Standing Calf Raise", "Seated Calf Raise",                           # 9 Calves
-     "Donkey Calf Raise", "Leg Press Calf Raise"],
-    ["Treadmill", "Cycling", "Rowing Machine", "Elliptical",               # 10 Cardio
-     "Jump Rope", "HIIT", "Swimming", "Stair Climber"],
-]
+# Exercise catalog — language-aware, loaded once per session
+_EXERCISE_CATALOG = get_catalog(lang)
 
 # Keywords → muscle group index (sorted longest-first to avoid false prefix matches)
 _EXERCISE_MUSCLE_MAP = sorted({
