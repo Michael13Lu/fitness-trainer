@@ -1189,6 +1189,64 @@ with tab_analysis:
 # ============================================================
 # ВКЛАДКА 5: ПРОГРАММА ТРЕНИРОВОК
 # ============================================================
+def _parse_program_to_calendar(program_text: str) -> list[dict]:
+    """Ask LLM to parse program into weeks × days structure."""
+    _prompt = (
+        "Разбери следующую программу тренировок на недели и дни. "
+        "Верни JSON-массив недель. Каждая неделя — объект с ключом 'week' (номер) "
+        "и 'days' — массив из 7 элементов (Пн..Вс). "
+        "Каждый день: {'day': 'Пн', 'exercises': ['Упражнение 1 — 3×10', ...]} "
+        "или {'day': 'Пн', 'exercises': [], 'rest': true} если день отдыха. "
+        "Только JSON, без объяснений.\n\n" + program_text[:3000]
+    )
+    try:
+        import re as _re3, json as _json3
+        _raw = llm_text.invoke(_prompt).content.strip()
+        _m = _re3.search(r'\[.*\]', _raw, _re3.DOTALL)
+        if _m:
+            return _json3.loads(_m.group())
+    except Exception:
+        pass
+    return []
+
+
+def _render_program_calendar(weeks: list, lang_code: str):
+    day_labels = t(lang_code, "week_days")  # Пн..Вс
+    rest_label = t(lang_code, "rest_day")
+    week_label = t(lang_code, "program_week")
+
+    for week in weeks:
+        st.markdown(f"#### {week_label} {week.get('week', '')}")
+        cols = st.columns(7)
+        days = week.get("days", [])
+        for i, col in enumerate(cols):
+            with col:
+                day_data = days[i] if i < len(days) else {}
+                is_rest = day_data.get("rest", False) or not day_data.get("exercises")
+                st.markdown(
+                    f"<div style='background:{'#f0f0f0' if is_rest else '#e8f4fd'};"
+                    f"border-radius:8px;padding:8px;min-height:120px;"
+                    f"border-top:3px solid {'#ccc' if is_rest else '#3498db'}'>"
+                    f"<b style='font-size:13px'>{day_labels[i]}</b><br>",
+                    unsafe_allow_html=True,
+                )
+                if is_rest:
+                    st.markdown(
+                        f"<div style='color:#999;font-size:12px;margin-top:6px'>"
+                        f"💤 {rest_label}</div></div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    exs = day_data.get("exercises", [])
+                    items = "".join(
+                        f"<div style='font-size:11px;margin-top:4px;"
+                        f"padding:3px 5px;background:#fff;border-radius:4px;"
+                        f"border-left:2px solid #3498db'>• {ex}</div>"
+                        for ex in exs
+                    )
+                    st.markdown(items + "</div>", unsafe_allow_html=True)
+
+
 with tab_program:
     st.subheader(t(lang, "tab_program"))
 
@@ -1198,36 +1256,59 @@ with tab_program:
     if active:
         st.success(f"✅ {t(lang, 'active_program')}: **{active['title']}**  "
                    f"— {active['updated_at'][:10]}")
-        edited_text = st.text_area(
-            t(lang, "program_text"),
-            value=active["raw_text"],
-            height=420,
-            key="program_edit_area",
+
+        # Переключатель вид
+        _prog_view = st.radio(
+            "view", [t(lang, "view_calendar"), t(lang, "view_text")],
+            horizontal=True, label_visibility="collapsed", key="prog_view_toggle"
         )
-        col_save, col_ask = st.columns(2)
-        with col_save:
-            if st.button(f"💾 {t(lang, 'btn_save')}", use_container_width=True):
-                update_program_text(active["id"], edited_text)
-                st.success(t(lang, "program_saved"))
-                st.rerun()
-        with col_ask:
-            if st.button(f"🤖 {t(lang, 'program_ask_correction')}", use_container_width=True):
-                _diary_text = get_workouts_as_text(name, limit=30)
-                _correction_prompt = (
-                    f"Вот моя текущая программа тренировок:\n\n{edited_text}\n\n"
-                    f"Вот мой дневник тренировок за последнее время:\n\n{_diary_text}\n\n"
-                    f"Проанализируй программу с учётом моих реальных результатов. "
-                    f"Предложи конкретные корректировки и верни ПОЛНУЮ обновлённую программу."
-                )
-                with st.chat_message("assistant"):
-                    with st.spinner(t(lang, "thinking")):
-                        _corr_resp = chain.invoke(get_chain_input(_correction_prompt))
-                    st.markdown(_corr_resp)
-                if st.button(f"💾 {t(lang, 'program_saved')} ← применить ответ тренера",
-                             key="apply_correction", use_container_width=True):
-                    update_program_text(active["id"], _corr_resp)
+
+        if _prog_view == t(lang, "view_calendar"):
+            # Парсим программу в структуру (кэшируем по id программы)
+            _cache_key = f"prog_calendar_{active['id']}"
+            if _cache_key not in st.session_state:
+                with st.spinner(t(lang, "thinking")):
+                    st.session_state[_cache_key] = _parse_program_to_calendar(active["raw_text"])
+            _weeks = st.session_state[_cache_key]
+            if _weeks:
+                _render_program_calendar(_weeks, lang)
+            else:
+                st.warning("Не удалось распознать структуру программы. Переключись на режим 'Текст'.")
+
+        else:
+            edited_text = st.text_area(
+                t(lang, "program_text"),
+                value=active["raw_text"],
+                height=420,
+                key="program_edit_area",
+            )
+            col_save, col_ask = st.columns(2)
+            with col_save:
+                if st.button(f"💾 {t(lang, 'btn_save')}", use_container_width=True):
+                    update_program_text(active["id"], edited_text)
+                    # Сбрасываем кэш календаря чтобы перепарсить
+                    st.session_state.pop(f"prog_calendar_{active['id']}", None)
                     st.success(t(lang, "program_saved"))
                     st.rerun()
+            with col_ask:
+                if st.button(f"🤖 {t(lang, 'program_ask_correction')}", use_container_width=True):
+                    _diary_text = get_workouts_as_text(name, limit=30)
+                    _correction_prompt = (
+                        f"Вот моя текущая программа тренировок:\n\n{edited_text}\n\n"
+                        f"Вот мой дневник тренировок за последнее время:\n\n{_diary_text}\n\n"
+                        f"Проанализируй программу с учётом моих реальных результатов. "
+                        f"Предложи конкретные корректировки и верни ПОЛНУЮ обновлённую программу."
+                    )
+                    with st.chat_message("assistant"):
+                        with st.spinner(t(lang, "thinking")):
+                            _corr_resp = chain.invoke(get_chain_input(_correction_prompt))
+                        st.markdown(_corr_resp)
+                    if st.button(f"💾 {t(lang, 'program_saved')} ← применить ответ тренера",
+                                 key="apply_correction", use_container_width=True):
+                        update_program_text(active["id"], _corr_resp)
+                        st.session_state.pop(f"prog_calendar_{active['id']}", None)
+                        st.success(t(lang, "program_saved"))
+                        st.rerun()
     else:
         st.info(t(lang, "no_program"))
         if st.button(f"🤖 {t(lang, 'program_generate')}", use_container_width=True):
