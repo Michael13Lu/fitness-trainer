@@ -1198,7 +1198,6 @@ with tab_program:
     if active:
         st.success(f"✅ {t(lang, 'active_program')}: **{active['title']}**  "
                    f"— {active['updated_at'][:10]}")
-        # Редактируемый текст программы
         edited_text = st.text_area(
             t(lang, "program_text"),
             value=active["raw_text"],
@@ -1213,15 +1212,22 @@ with tab_program:
                 st.rerun()
         with col_ask:
             if st.button(f"🤖 {t(lang, 'program_ask_correction')}", use_container_width=True):
+                _diary_text = get_workouts_as_text(name, limit=30)
                 _correction_prompt = (
                     f"Вот моя текущая программа тренировок:\n\n{edited_text}\n\n"
-                    f"Проанализируй её с учётом моих данных и дневника тренировок. "
-                    f"Предложи конкретные корректировки."
+                    f"Вот мой дневник тренировок за последнее время:\n\n{_diary_text}\n\n"
+                    f"Проанализируй программу с учётом моих реальных результатов. "
+                    f"Предложи конкретные корректировки и верни ПОЛНУЮ обновлённую программу."
                 )
                 with st.chat_message("assistant"):
                     with st.spinner(t(lang, "thinking")):
                         _corr_resp = chain.invoke(get_chain_input(_correction_prompt))
                     st.markdown(_corr_resp)
+                if st.button(f"💾 {t(lang, 'program_saved')} ← применить ответ тренера",
+                             key="apply_correction", use_container_width=True):
+                    update_program_text(active["id"], _corr_resp)
+                    st.success(t(lang, "program_saved"))
+                    st.rerun()
     else:
         st.info(t(lang, "no_program"))
         if st.button(f"🤖 {t(lang, 'program_generate')}", use_container_width=True):
@@ -1235,6 +1241,17 @@ with tab_program:
                 with st.spinner(t(lang, "thinking")):
                     _gen_resp = chain.invoke(get_chain_input(_gen_prompt))
                 st.markdown(_gen_resp)
+            # Автосохранение сгенерированной программы
+            try:
+                _title_resp = llm_text.invoke(
+                    f"Придумай короткое название (3-5 слов) для этой программы тренировок. "
+                    f"Только название, без кавычек:\n\n{_gen_resp[:500]}"
+                ).content.strip()[:60]
+            except Exception:
+                _title_resp = t(lang, "tab_program")
+            save_program(name, _title_resp, _gen_resp)
+            st.success(f"💾 {t(lang, 'program_saved')}: **{_title_resp}**")
+            st.rerun()
 
     # История программ
     if len(all_progs) > 1:
