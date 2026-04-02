@@ -423,6 +423,10 @@ def get_chain_input(user_input: str) -> dict:
         _prog_info = (f"Current training program «{_prog['title']}» "
                       f"(saved {_prog['updated_at'][:10]}):\n{_prog['raw_text'][:1500]}\n"
                       f"Take this program into account when giving advice and corrections.")
+        if _active_tab == "program":
+            _prog_info += ("\nIMPORTANT: The user is currently viewing the training program tab. "
+                           "They want to discuss or modify this specific program. "
+                           "Focus your response on the program structure, exercises, and scheduling.")
     else:
         _prog_info = ""
     return {
@@ -513,6 +517,36 @@ If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}
 
 
 # ============================================================
+# ОПРЕДЕЛЕНИЕ АКТИВНОЙ ВКЛАДКИ через JS → query param
+# ============================================================
+components.html("""<script>
+(function() {
+    function syncTab() {
+        try {
+            var tabs = window.parent.document.querySelectorAll('[role="tab"]');
+            var idx = 0;
+            tabs.forEach(function(tab, i) {
+                if (tab.getAttribute('aria-selected') === 'true') idx = i;
+            });
+            var url = new URL(window.parent.location.href);
+            if (url.searchParams.get('_t') !== String(idx)) {
+                url.searchParams.set('_t', String(idx));
+                window.parent.history.replaceState(null, '', url.toString());
+            }
+        } catch(e) {}
+    }
+    window.parent.document.addEventListener('click', function(e) {
+        if (e.target.closest('[role="tab"]')) { syncTab(); }
+    }, true);
+    syncTab();
+})();
+</script>""", height=0)
+
+_TAB_NAMES = ["chat", "diary", "food", "analysis", "program"]
+_t_raw = st.query_params.get("_t", "0")
+_active_tab = _TAB_NAMES[int(_t_raw)] if _t_raw.isdigit() and int(_t_raw) < len(_TAB_NAMES) else "chat"
+
+# ============================================================
 # ВКЛАДКИ
 # ============================================================
 tab_chat, tab_diary, tab_food, tab_analysis, tab_program = st.tabs([
@@ -529,6 +563,15 @@ with tab_chat:
             if msg.get("image"):
                 st.image(msg["image"], width=200)
             st.markdown(msg["content"])
+
+    # Прикрепить файл / фото
+    with st.expander("📎", expanded=False):
+        _uploaded = st.file_uploader(
+            "attach", type=["jpg", "jpeg", "png", "webp", "pdf", "csv"],
+            label_visibility="collapsed", key="_chat_file_widget"
+        )
+        if _uploaded:
+            st.session_state["_chat_upload_file"] = _uploaded
 
     # Микрофон
     col_mic, _ = st.columns([0.12, 0.88])
@@ -559,16 +602,12 @@ with tab_chat:
             save_message(name, "assistant", response)
             st.session_state.messages.append({"role": "assistant", "content": response})
 
-# Текстовый ввод + файл
-msg = st.chat_input(
-    t(lang, "chat_placeholder"),
-    accept_file=True,
-    file_type=["jpg", "jpeg", "png", "webp", "pdf", "csv"],
-)
+# Текстовый ввод
+msg = st.chat_input(t(lang, "chat_placeholder"))
 
 if msg:
-    user_input = msg.text or ""
-    attached = msg["files"][0] if msg["files"] else None
+    user_input = msg
+    attached = st.session_state.pop("_chat_upload_file", None)
     is_image = attached and attached.type in ("image/jpeg", "image/png", "image/webp", "image/jpg")
     is_doc = attached and not is_image
 
@@ -1434,64 +1473,10 @@ with tab_program:
             st.success(f"💾 {t(lang, 'program_saved')}: **{_title_resp}**")
             st.rerun()
 
-    # ── Чат с тренером в контексте программы ────────────────
+    # ── Подсказка — чат доступен на вкладке Чат ─────────────
     if active:
         st.divider()
-        st.markdown(f"**🤖 {t(lang, 'thinking').replace('...', '')} — {t(lang, 'tab_program')}**")
-
-        # История чата программы
-        if "prog_chat_messages" not in st.session_state:
-            st.session_state.prog_chat_messages = []
-        for _pm in st.session_state.prog_chat_messages:
-            with st.chat_message(_pm["role"]):
-                st.markdown(_pm["content"])
-
-        _prog_input = st.chat_input(t(lang, "chat_placeholder"), key="prog_chat_input")
-        if _prog_input:
-            _active_now = get_active_program(name)
-            _prog_ctx = _active_now["raw_text"] if _active_now else ""
-            _diary_ctx = get_workouts_as_text(name, limit=20)
-            _prog_prompt = (
-                f"Текущая программа тренировок пользователя:\n{_prog_ctx}\n\n"
-                f"Дневник тренировок:\n{_diary_ctx}\n\n"
-                f"Сообщение пользователя: {_prog_input}\n\n"
-                f"Если пользователь хочет изменить программу — предложи ПОЛНУЮ обновлённую версию "
-                f"и добавь в конце тег [UPDATED_PROGRAM] чтобы её можно было сохранить."
-            )
-            with st.chat_message("user"):
-                st.markdown(_prog_input)
-            st.session_state.prog_chat_messages.append({"role": "user", "content": _prog_input})
-
-            with st.chat_message("assistant"):
-                with st.spinner(t(lang, "thinking")):
-                    _prog_resp = chain.invoke(get_chain_input(_prog_prompt))
-                # Если тренер предлагает обновлённую программу
-                if "[UPDATED_PROGRAM]" in _prog_resp:
-                    _clean_resp = _prog_resp.replace("[UPDATED_PROGRAM]", "").strip()
-                    st.markdown(_clean_resp)
-                    if st.button(f"💾 {t(lang, 'program_saved')} ← применить",
-                                 key="apply_prog_chat", use_container_width=True):
-                        update_program_text(active["id"], _clean_resp)
-                        st.session_state.pop(f"prog_calendar_{active['id']}", None)
-                        st.success(t(lang, "program_saved"))
-                        st.rerun()
-                else:
-                    st.markdown(_prog_resp)
-                    _clean_resp = _prog_resp
-            st.session_state.prog_chat_messages.append({"role": "assistant", "content": _clean_resp})
-
-            # Видео по упражнениям если упомянуты
-            try:
-                import re as _re4, json as _json4
-                _ex_p = (f"List exercise names from this text as JSON array of strings. "
-                         f"Empty array [] if none. Only JSON:\n{_prog_resp[:1000]}")
-                _ex_r = llm_text.invoke(_ex_p).content.strip()
-                _ex_m = _re4.search(r'\[.*?\]', _ex_r, _re4.DOTALL)
-                _found = _json4.loads(_ex_m.group()) if _ex_m else []
-            except Exception:
-                _found = []
-            if _found:
-                st.session_state.sidebar_exercises = _found[:8]
+        st.info(f"💬 {t(lang, 'program_chat_hint')}", icon="🤖")
 
     # История программ
     if len(all_progs) > 1:
