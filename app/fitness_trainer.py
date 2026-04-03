@@ -1411,11 +1411,25 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                     if _prev_imgs or _prev_schema:
                         with st.expander(f"📷 {_ex_pick}", expanded=True):
                             if _prev_imgs:
-                                # Показываем до 2 кадров рядом (начало и конец движения)
                                 _frames = _prev_imgs[:2]
-                                _cols = st.columns(len(_frames))
-                                for _ci, _url in enumerate(_frames):
-                                    _cols[_ci].image(_url, use_container_width=True)
+                                if len(_frames) == 2:
+                                    import json as _jf
+                                    _urls_js = _jf.dumps(_frames)
+                                    components.html(f"""
+                                        <img id="exframe" src="{_frames[0]}"
+                                             style="width:100%; border-radius:8px;">
+                                        <script>
+                                        (function(){{
+                                            var urls={_urls_js}, i=0;
+                                            setInterval(function(){{
+                                                i=(i+1)%urls.length;
+                                                document.getElementById('exframe').src=urls[i];
+                                            }}, 2000);
+                                        }})();
+                                        </script>
+                                    """, height=280)
+                                else:
+                                    st.image(_frames[0], use_container_width=True)
                             if _prev_schema:
                                 st.caption(_prev_schema)
 
