@@ -1404,7 +1404,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                     _prev_imgs = get_exercise_images(_lookup)
                     _prev_schema = get_exercise_schema(_lookup)
 
-                    _img_col, _fields_col = st.columns([0.35, 0.65])
+                    _img_col, _fields_col = st.columns([0.45, 0.55])
                     with _img_col:
                         if _prev_imgs:
                             _frames = _prev_imgs[:2]
@@ -1413,7 +1413,8 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                                 _urls_js = _jf.dumps(_frames)
                                 components.html(f"""
                                     <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
-                                         style="width:100%; height:auto; border-radius:8px; display:block;">
+                                         style="width:100%; height:auto; border-radius:8px;
+                                                display:block; object-fit:contain;">
                                     <script>
                                     (function(){{
                                         var urls={_urls_js}, i=0;
@@ -1423,7 +1424,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                                         }}, 2000);
                                     }})();
                                     </script>
-                                """, height=220)
+                                """, height=320)
                             else:
                                 st.image(_frames[0], use_container_width=True)
 
