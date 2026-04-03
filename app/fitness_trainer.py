@@ -1413,9 +1413,9 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                                 _urls_js = _jf.dumps(_frames)
                                 components.html(f"""
                                     <div style="border-radius:12px; overflow:hidden;
-                                                display:inline-block; width:100%;">
+                                                width:100%; aspect-ratio:1/1;">
                                         <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
-                                             style="width:100%; height:auto; display:block;">
+                                             style="width:100%; height:100%; object-fit:cover; display:block;">
                                     </div>
                                     <script>
                                     (function(){{
