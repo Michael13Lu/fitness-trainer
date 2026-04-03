@@ -107,3 +107,11 @@ def get_exercise_gif(exercise_name: str) -> str | None:
     if not ex:
         return None
     return ex["image_urls"][0] if ex["image_urls"] else None
+
+
+def get_exercise_images(exercise_name: str) -> list[str]:
+    """Возвращает все кадры упражнения (обычно 2: начало и конец движения)."""
+    ex = search_exercise(exercise_name)
+    if not ex:
+        return []
+    return ex["image_urls"]

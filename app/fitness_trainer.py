@@ -31,7 +31,7 @@ from exercise_catalog import get_catalog
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
 from googleapiclient.discovery import build as gcal_build
-from exercise_db_integration import get_exercise_schema, get_exercise_gif
+from exercise_db_integration import get_exercise_schema, get_exercise_gif, get_exercise_images
 
 from utils import calc_tdee, calc_realistic_date
 
@@ -1406,13 +1406,16 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                 # ── Превью выбранного упражнения ────────────────────
                 if _ex_pick:
                     _lookup = _en_name_for(_ex_pick, _mg_i)
-                    _prev_gif = get_exercise_gif(_lookup)
+                    _prev_imgs = get_exercise_images(_lookup)
                     _prev_schema = get_exercise_schema(_lookup)
-                    if _prev_gif or _prev_schema:
+                    if _prev_imgs or _prev_schema:
                         with st.expander(f"📷 {_ex_pick}", expanded=True):
-                            if _prev_gif:
-                                _img_col, _ = st.columns([0.25, 0.75])
-                                _img_col.image(_prev_gif, use_container_width=True)
+                            if _prev_imgs:
+                                # Показываем до 2 кадров рядом (начало и конец движения)
+                                _frames = _prev_imgs[:2]
+                                _cols = st.columns(len(_frames))
+                                for _ci, _url in enumerate(_frames):
+                                    _cols[_ci].image(_url, use_container_width=True)
                             if _prev_schema:
                                 st.caption(_prev_schema)
 
