@@ -1412,19 +1412,22 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                                 import json as _jf
                                 _urls_js = _jf.dumps(_frames)
                                 components.html(f"""
-                                    <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
-                                         style="width:100%; height:auto; border-radius:16px;
-                                                display:block; object-fit:contain;">
+                                    <div style="border-radius:16px; overflow:hidden;
+                                                display:inline-block; width:100%;">
+                                        <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
+                                             style="width:100%; height:auto; display:block;">
+                                    </div>
                                     <script>
                                     (function(){{
+                                        var img=document.getElementById('exframe_{wi}_{edi}');
                                         var urls={_urls_js}, i=0;
                                         setInterval(function(){{
                                             i=(i+1)%urls.length;
-                                            document.getElementById('exframe_{wi}_{edi}').src=urls[i];
+                                            img.src=urls[i];
                                         }}, 2000);
                                     }})();
                                     </script>
-                                """, height=330)
+                                """, height=340)
                             else:
                                 st.image(_frames[0], use_container_width=True)
 
