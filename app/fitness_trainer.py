@@ -1382,7 +1382,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                 st.markdown("---")
 
                 # ── Add from catalog ────────────────────────────────
-                _cA, _cB, _cC = st.columns([0.30, 0.52, 0.18])
+                _cA, _cB = st.columns([0.35, 0.65])
                 with _cA:
                     _mg_i = st.selectbox(
                         "mg", range(len(_mgs)),
@@ -1397,43 +1397,60 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                         label_visibility="collapsed",
                         key=f"exp_{wi}_{edi}",
                     )
-                with _cC:
-                    if st.button("➕", key=f"addc_{wi}_{edi}",
-                                 use_container_width=True) and _ex_pick:
-                        if _ex_pick not in _exs:
-                            st.session_state[_ekey].append(_ex_pick)
-                        st.rerun()
 
-                # ── Превью выбранного упражнения ────────────────────
+                # ── Превью + поля подходов/повторений/веса ──────────
                 if _ex_pick:
                     _lookup = _en_name_for(_ex_pick, _mg_i)
                     _prev_imgs = get_exercise_images(_lookup)
                     _prev_schema = get_exercise_schema(_lookup)
-                    if _prev_imgs or _prev_schema:
-                        with st.expander(f"📷 {_ex_pick}", expanded=True):
-                            if _prev_imgs:
-                                _frames = _prev_imgs[:2]
-                                if len(_frames) == 2:
-                                    import json as _jf
-                                    _urls_js = _jf.dumps(_frames)
-                                    components.html(f"""
-                                        <img id="exframe" src="{_frames[0]}"
-                                             style="width:25%; height:auto; border-radius:8px; display:block;">
-                                        <script>
-                                        (function(){{
-                                            var urls={_urls_js}, i=0;
-                                            setInterval(function(){{
-                                                i=(i+1)%urls.length;
-                                                document.getElementById('exframe').src=urls[i];
-                                            }}, 2000);
-                                        }})();
-                                        </script>
-                                    """, height=220)
-                                else:
-                                    _img_col, _ = st.columns([0.25, 0.75])
-                                    _img_col.image(_frames[0], use_container_width=True)
-                            if _prev_schema:
-                                st.caption(_prev_schema)
+
+                    _img_col, _fields_col = st.columns([0.35, 0.65])
+                    with _img_col:
+                        if _prev_imgs:
+                            _frames = _prev_imgs[:2]
+                            if len(_frames) == 2:
+                                import json as _jf
+                                _urls_js = _jf.dumps(_frames)
+                                components.html(f"""
+                                    <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
+                                         style="width:100%; height:auto; border-radius:8px; display:block;">
+                                    <script>
+                                    (function(){{
+                                        var urls={_urls_js}, i=0;
+                                        setInterval(function(){{
+                                            i=(i+1)%urls.length;
+                                            document.getElementById('exframe_{wi}_{edi}').src=urls[i];
+                                        }}, 2000);
+                                    }})();
+                                    </script>
+                                """, height=220)
+                            else:
+                                st.image(_frames[0], use_container_width=True)
+
+                    with _fields_col:
+                        if _prev_schema:
+                            st.caption(_prev_schema)
+                        st.markdown("---")
+                        _s_col, _r_col, _w_col = st.columns(3)
+                        _sets = _s_col.number_input(
+                            t(lang_code, "sets"), min_value=1, max_value=20, value=3,
+                            key=f"sets_{wi}_{edi}"
+                        )
+                        _reps = _r_col.number_input(
+                            t(lang_code, "reps"), min_value=1, max_value=100, value=10,
+                            key=f"reps_{wi}_{edi}"
+                        )
+                        _kg = _w_col.number_input(
+                            t(lang_code, "weight_kg"), min_value=0.0, max_value=500.0,
+                            value=0.0, step=2.5, key=f"kg_{wi}_{edi}"
+                        )
+                        _ex_str = f"{_ex_pick} {_sets}×{_reps}"
+                        if _kg > 0:
+                            _ex_str += f" @ {_kg:.0f}кг"
+                        if st.button(f"➕ {_ex_str}", key=f"addc_{wi}_{edi}",
+                                     use_container_width=True):
+                            st.session_state[_ekey].append(_ex_str)
+                            st.rerun()
 
                 # ── Add custom exercise ─────────────────────────────
                 _cX, _cY = st.columns([0.82, 0.18])
