@@ -1387,6 +1387,17 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                             st.session_state[_ekey].append(_ex_pick)
                         st.rerun()
 
+                # ── Превью выбранного упражнения ────────────────────
+                if _ex_pick:
+                    _prev_gif = get_exercise_gif(_ex_pick)
+                    _prev_schema = get_exercise_schema(_ex_pick)
+                    if _prev_gif or _prev_schema:
+                        with st.expander(f"📷 {_ex_pick}", expanded=True):
+                            if _prev_gif:
+                                st.image(_prev_gif, use_container_width=True)
+                            if _prev_schema:
+                                st.caption(_prev_schema)
+
                 # ── Add custom exercise ─────────────────────────────
                 _cX, _cY = st.columns([0.82, 0.18])
                 with _cX:
