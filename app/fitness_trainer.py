@@ -31,6 +31,7 @@ from exercise_catalog import get_catalog
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
 from googleapiclient.discovery import build as gcal_build
+from exercise_db_integration import get_exercise_schema, get_exercise_gif
 
 from utils import calc_tdee, calc_realistic_date
 
@@ -762,11 +763,28 @@ with tab_diary:
                                    placeholder=t(lang, "exercise_placeholder"),
                                    key="_w_exercise_input",
                                    on_change=_on_exercise_change)
+        
+        # Показываем схему выполнения из ExerciseDB
+        if w_exercise:
+            _schema = get_exercise_schema(w_exercise)
+            if _schema:
+                st.info(_schema)
+        
         w_muscle = st.selectbox(t(lang, "muscle_group"), MUSCLE_GROUPS, index=_mg_index)
         if w_muscle != MUSCLE_GROUPS[-1]:  # не показываем для кардио
             components.html(get_muscle_html(w_muscle, lang=lang), height=380)
     with col2:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
+        
+        # Показываем GIF-анимацию из ExerciseDB если доступна
+        if w_exercise and w_muscle != MUSCLE_GROUPS[-1]:
+            _gif_url = get_exercise_gif(w_exercise)
+            if _gif_url:
+                st.markdown(f"**📹 Техника выполнения:**")
+                try:
+                    st.image(_gif_url, use_column_width=True, caption=w_exercise)
+                except Exception:
+                    pass
 
         if is_cardio:
             w_cardio_type = st.selectbox("Вид кардио", t(lang, "cardio_types"))
