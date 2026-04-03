@@ -333,6 +333,22 @@ MUSCLE_GROUPS = t(lang, "muscle_groups")
 
 # Exercise catalog — language-aware, loaded once per session
 _EXERCISE_CATALOG = get_catalog(lang)
+_EN_CATALOG = get_catalog("en")   # всегда английский — для поиска в JSON базе
+
+
+def _en_name_for(ex_pick: str, mg_idx: int) -> str:
+    """Возвращает английское название упражнения для поиска в базе."""
+    if lang == "en":
+        return ex_pick
+    try:
+        ru_list = _EXERCISE_CATALOG[mg_idx]
+        idx = ru_list.index(ex_pick)
+        en_list = _EN_CATALOG[mg_idx]
+        if idx < len(en_list):
+            return en_list[idx]
+    except (ValueError, IndexError):
+        pass
+    return ex_pick
 
 # Keywords → muscle group index (sorted longest-first to avoid false prefix matches)
 _EXERCISE_MUSCLE_MAP = sorted({
@@ -1389,8 +1405,9 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
 
                 # ── Превью выбранного упражнения ────────────────────
                 if _ex_pick:
-                    _prev_gif = get_exercise_gif(_ex_pick)
-                    _prev_schema = get_exercise_schema(_ex_pick)
+                    _lookup = _en_name_for(_ex_pick, _mg_i)
+                    _prev_gif = get_exercise_gif(_lookup)
+                    _prev_schema = get_exercise_schema(_lookup)
                     if _prev_gif or _prev_schema:
                         with st.expander(f"📷 {_ex_pick}", expanded=True):
                             if _prev_gif:
