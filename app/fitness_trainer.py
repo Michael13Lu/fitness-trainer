@@ -1413,7 +1413,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                                 _urls_js = _jf.dumps(_frames)
                                 components.html(f"""
                                     <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
-                                         style="width:100%; height:auto; border-radius:8px;
+                                         style="width:100%; height:auto; border-radius:16px;
                                                 display:block; object-fit:contain;">
                                     <script>
                                     (function(){{
@@ -1424,7 +1424,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                                         }}, 2000);
                                     }})();
                                     </script>
-                                """, height=320)
+                                """, height=330)
                             else:
                                 st.image(_frames[0], use_container_width=True)
 
