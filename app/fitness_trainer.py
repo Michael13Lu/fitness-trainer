@@ -201,21 +201,16 @@ with st.sidebar:
             _query = f"{_ex_name} {_suffix}".replace(" ", "+")
             _search_url = f"https://www.youtube.com/results?search_query={_query}"
             st.caption(f"🔍 {_ex_name}")
-            components.html(f"""
-                <iframe
-                    src="https://www.youtube.com/embed?listType=search&list={_query}"
-                    width="100%" height="220"
-                    frameborder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                    allowfullscreen>
-                </iframe>
-                <div style="margin-top:6px; font-size:12px;">
-                    <a href="{_search_url}" target="_blank"
-                       style="color:#e74c3c; text-decoration:none;">
-                        🔍 Все результаты на YouTube →
-                    </a>
-                </div>
-            """, height=265)
+            # Показываем GIF из локальной базы
+            _gif = get_exercise_gif(_selected_ex)
+            if _gif:
+                st.image(_gif, use_container_width=True, caption=_selected_ex)
+            # Схема выполнения
+            _schema = get_exercise_schema(_selected_ex)
+            if _schema:
+                st.info(_schema)
+            # Ссылка на YouTube (embed listType=search отключён в 2023)
+            st.link_button("▶ " + t(lang, "video_tutorials") + " на YouTube", _search_url, use_container_width=True)
         else:
             st.caption("Нажми ▶ на упражнении в программе — здесь появится видео.")
 
@@ -781,10 +776,7 @@ with tab_diary:
             _gif_url = get_exercise_gif(w_exercise)
             if _gif_url:
                 st.markdown(f"**📹 Техника выполнения:**")
-                try:
-                    st.image(_gif_url, use_column_width=True, caption=w_exercise)
-                except Exception:
-                    pass
+                st.image(_gif_url, use_container_width=True, caption=w_exercise)
 
         if is_cardio:
             w_cardio_type = st.selectbox("Вид кардио", t(lang, "cardio_types"))
