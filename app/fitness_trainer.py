@@ -776,7 +776,7 @@ with tab_diary:
     with col2:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
         
-        # Показываем GIF-анимацию из ExerciseDB если доступна
+        # Показываем схему/кадр выполнения упражнения из локального каталога
         if w_exercise and w_muscle != MUSCLE_GROUPS[-1]:
             _gif_url = get_exercise_gif(w_exercise)
             if _gif_url:
