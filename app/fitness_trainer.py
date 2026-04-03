@@ -1468,7 +1468,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                     if st.button("➕ +", key=f"addx_{wi}_{edi}",
                                  use_container_width=True) and _custom.strip():
                         st.session_state[_ekey].append(_custom.strip())
-                        st.session_state[f"cust_{wi}_{edi}"] = ""
+                        st.session_state.pop(f"cust_{wi}_{edi}", None)
                         st.rerun()
 
             col_s, col_c = st.columns(2)
