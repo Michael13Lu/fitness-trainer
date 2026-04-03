@@ -1255,7 +1255,7 @@ Return ONLY a valid JSON array with this exact structure:
 
 Rules:
 - days array must always have exactly 7 elements (Mon=0 to Sun=6)
-- exercises: short strings like "Exercise name Nsets x Nreps"
+- exercises: copy the exercise strings EXACTLY as written in the original text — do NOT translate, do NOT rename, do NOT change language
 - rest: true if no training that day
 - If program has no explicit weeks, treat it as week 1
 - Output ONLY the JSON array, no markdown, no explanation
@@ -1514,6 +1514,10 @@ with tab_program:
         if _prog_view == t(lang, "view_calendar"):
             # Парсим программу в структуру (кэшируем по id программы)
             _cache_key = f"prog_calendar_{active['id']}"
+            _col_refresh, _ = st.columns([1, 5])
+            with _col_refresh:
+                if st.button("🔄", key="refresh_calendar", help="Перепарсить программу"):
+                    st.session_state.pop(_cache_key, None)
             if _cache_key not in st.session_state:
                 with st.spinner(t(lang, "thinking")):
                     st.session_state[_cache_key] = _parse_program_to_calendar(active["raw_text"])
