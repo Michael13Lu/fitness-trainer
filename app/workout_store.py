@@ -1,11 +1,8 @@
-import sqlite3
-import os
-from datetime import date  # noqa
-
-DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
+﻿import sqlite3
+from config import DB_PATH
 
 
-def init_workout_db():
+def _init_db():
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS workouts (
@@ -18,23 +15,20 @@ def init_workout_db():
                 reps INTEGER,
                 weight_kg REAL,
                 notes TEXT,
+                cardio_type TEXT,
+                duration_min INTEGER,
+                distance_km REAL,
+                avg_hr INTEGER,
+                workout_start TEXT,
+                workout_end TEXT,
+                rest_sec INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Доп. поля — добавляем если ещё нет
-        for col, typedef in [
-            ("cardio_type", "TEXT"),
-            ("duration_min", "INTEGER"),
-            ("distance_km", "REAL"),
-            ("avg_hr", "INTEGER"),
-            ("workout_start", "TEXT"),
-            ("workout_end", "TEXT"),
-            ("rest_sec", "INTEGER"),
-        ]:
-            try:
-                conn.execute(f"ALTER TABLE workouts ADD COLUMN {col} {typedef}")
-            except sqlite3.OperationalError:
-                pass  # уже существует
+
+
+# Инициализируем БД один раз при импорте модуля
+_init_db()
 
 
 def add_exercise(user_name: str, workout_date: str, exercise: str,
@@ -42,7 +36,6 @@ def add_exercise(user_name: str, workout_date: str, exercise: str,
                  notes: str = "", cardio_type: str = "", duration_min: int = 0,
                  distance_km: float = 0.0, avg_hr: int = 0,
                  workout_start: str = "", workout_end: str = "", rest_sec: int = 0):
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             INSERT INTO workouts
@@ -56,7 +49,6 @@ def add_exercise(user_name: str, workout_date: str, exercise: str,
 
 
 def get_workouts(user_name: str, limit: int = 100) -> list:
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT id, workout_date, exercise, muscle_group, sets, reps, weight_kg, notes,
@@ -76,7 +68,6 @@ def get_workouts(user_name: str, limit: int = 100) -> list:
 
 def update_exercise(row_id: int, exercise: str, muscle_group: str,
                     sets: int, reps: int, weight_kg: float, notes: str):
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             UPDATE workouts
@@ -87,7 +78,6 @@ def update_exercise(row_id: int, exercise: str, muscle_group: str,
 
 def get_exercise_history(user_name: str, exercise: str) -> list:
     """История конкретного упражнения для анализа прогресса."""
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT workout_date, sets, reps, weight_kg
@@ -99,7 +89,6 @@ def get_exercise_history(user_name: str, exercise: str) -> list:
 
 def get_muscle_summary(user_name: str) -> str:
     """Сводка по группам мышц для анализа."""
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT muscle_group, COUNT(*) as sessions,
@@ -119,7 +108,6 @@ def get_muscle_summary(user_name: str) -> str:
 
 def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
     """Форматированный текст тренировок для отправки в LLM."""
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
             SELECT workout_date, exercise, muscle_group, sets, reps, weight_kg,
@@ -132,10 +120,10 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
         return "Дневник тренировок пуст."
     lines = []
     for r in rows:
-        date, exercise, mg, sets, reps, weight, notes, ctype, dur, dist, hr, wstart, wend = r
+        d, exercise, mg, sets, reps, weight, notes, ctype, dur, dist, hr, wstart, wend = r
         time_str = f" [{wstart}–{wend}]" if wstart and wend else ""
         if mg in ("Кардио", "Cardio", "קרדיו") or ctype or dur:
-            parts = [f"{date}{time_str} | {exercise} ({mg})"]
+            parts = [f"{d}{time_str} | {exercise} ({mg})"]
             if ctype:
                 parts.append(ctype)
             if dur:
@@ -149,7 +137,7 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
             lines.append(" | ".join(parts))
         else:
             lines.append(
-                f"{date}{time_str} | {exercise} ({mg}) | {sets}x{reps} @ {weight} кг"
+                f"{d}{time_str} | {exercise} ({mg}) | {sets}x{reps} @ {weight} кг"
                 + (f" | {notes}" if notes else "")
             )
     return "\n".join(lines)
@@ -157,20 +145,25 @@ def get_workouts_as_text(user_name: str, limit: int = 50) -> str:
 
 def get_workouts_by_date(user_name: str, workout_date: str) -> list:
     """Все упражнения за конкретную дату."""
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         rows = conn.execute("""
-            SELECT exercise, muscle_group, sets, reps, weight_kg, notes
+            SELECT exercise, muscle_group, sets, reps, weight_kg, notes,
+                   cardio_type, duration_min, distance_km, avg_hr,
+                   workout_start, workout_end
             FROM workouts WHERE user_name = ? AND workout_date = ?
             ORDER BY id ASC
         """, (user_name, workout_date)).fetchall()
-    return [{"exercise": r[0], "muscle_group": r[1],
-             "sets": r[2], "reps": r[3], "weight": r[4], "notes": r[5]}
-            for r in rows]
+    return [
+        {"exercise": r[0], "muscle_group": r[1],
+         "sets": r[2], "reps": r[3], "weight": r[4], "notes": r[5],
+         "cardio_type": r[6] or "", "duration_min": r[7] or 0,
+         "distance_km": r[8] or 0.0, "avg_hr": r[9] or 0,
+         "workout_start": r[10] or "", "workout_end": r[11] or ""}
+        for r in rows
+    ]
 
 
 def delete_last_exercise(user_name: str):
-    init_workout_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
             DELETE FROM workouts WHERE id = (

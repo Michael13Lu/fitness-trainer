@@ -119,6 +119,9 @@ T = {
         "program_activate": "Активировать",
         "program_chat_hint": "Для обсуждения программы напиши тренеру в чате — он знает твою текущую программу",
         "system_prompt_lang": "Отвечай на русском языке.",
+        "cardio_types": ["🏃 Бег", "🚴 Велосипед", "🏊 Плавание", "⛷️ Эллипсоид",
+                         "🚶 Ходьба", "🪜 Степпер", "🥊 Бокс/HIIT", "🛶 Гребля", "Другое"],
+        "hr_zones": ["Восстановление", "Жиросжигание", "Аэробная", "Анаэробная", "Максимальная"],
     },
     "en": {
         "app_title": "💪 Personal Fitness Trainer",
@@ -222,6 +225,9 @@ T = {
         "program_activate": "Activate",
         "program_chat_hint": "To discuss your program, message your trainer in the Chat tab — they know your current program",
         "system_prompt_lang": "Always respond in English.",
+        "cardio_types": ["🏃 Running", "🚴 Cycling", "🏊 Swimming", "⛷️ Elliptical",
+                         "🚶 Walking", "🪜 Stepper", "🥊 Boxing/HIIT", "🛶 Rowing", "Other"],
+        "hr_zones": ["Recovery", "Fat burning", "Aerobic", "Anaerobic", "Maximum"],
     },
     "es": {
         "app_title": "💪 Entrenador Personal",
@@ -325,6 +331,9 @@ T = {
         "program_activate": "Activar",
         "program_chat_hint": "Para hablar sobre tu programa, escríbele al entrenador en la pestaña Chat — conoce tu programa actual",
         "system_prompt_lang": "Responde siempre en español.",
+        "cardio_types": ["🏃 Correr", "🚴 Ciclismo", "🏊 Natación", "⛷️ Elíptica",
+                         "🚶 Caminar", "🪜 Escaladora", "🥊 Boxeo/HIIT", "🛶 Remo", "Otro"],
+        "hr_zones": ["Recuperación", "Quema de grasa", "Aeróbica", "Anaeróbica", "Máxima"],
     },
     "de": {
         "app_title": "💪 Persönlicher Fitnesstrainer",
@@ -428,6 +437,9 @@ T = {
         "program_activate": "Aktivieren",
         "program_chat_hint": "Um dein Programm zu besprechen, schreib dem Trainer im Chat-Tab — er kennt dein aktuelles Programm",
         "system_prompt_lang": "Antworte immer auf Deutsch.",
+        "cardio_types": ["🏃 Laufen", "🚴 Radfahren", "🏊 Schwimmen", "⛷️ Elliptical",
+                         "🚶 Gehen", "🪜 Stepper", "🥊 Boxen/HIIT", "🛶 Rudern", "Sonstiges"],
+        "hr_zones": ["Erholung", "Fettverbrennung", "Aerob", "Anaerob", "Maximum"],
     },
     "fr": {
         "app_title": "💪 Coach Fitness Personnel",
@@ -531,6 +543,9 @@ T = {
         "program_activate": "Activer",
         "program_chat_hint": "Pour discuter de votre programme, écrivez à votre coach dans l'onglet Chat — il connaît votre programme actuel",
         "system_prompt_lang": "Réponds toujours en français.",
+        "cardio_types": ["🏃 Course", "🚴 Vélo", "🏊 Natation", "⛷️ Elliptique",
+                         "🚶 Marche", "🪜 Stepper", "🥊 Boxe/HIIT", "🛶 Aviron", "Autre"],
+        "hr_zones": ["Récupération", "Brûlage de graisses", "Aérobie", "Anaérobie", "Maximum"],
     },
     "he": {
         "app_title": "💪 מאמן כושר אישי",
@@ -634,6 +649,9 @@ T = {
         "program_activate": "הפעל",
         "program_chat_hint": "כדי לדון בתוכנית שלך, שלח הודעה למאמן בלשונית הצ'אט — הוא מכיר את התוכנית הנוכחית שלך",
         "system_prompt_lang": "ענה תמיד בעברית.",
+        "cardio_types": ["🏃 ריצה", "🚴 רכיבה", "🏊 שחייה", "⛷️ אליפטי",
+                         "🚶 הליכה", "🪜 סטפר", "🥊 אגרוף/HIIT", "🛶 חתירה", "אחר"],
+        "hr_zones": ["התאוששות", "שריפת שומן", "אירובי", "אנאירובי", "מקסימלי"],
     },
 }
 

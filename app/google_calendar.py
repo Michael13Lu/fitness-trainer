@@ -7,9 +7,9 @@ import sqlite3
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from config import DB_PATH
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
-DB_PATH = os.path.join(os.path.dirname(__file__), "chat_history.db")
 
 
 def _client_config() -> dict:

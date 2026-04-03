@@ -1,7 +1,9 @@
 import os
+import re
 import base64
 import json
 import io
+import datetime as _dt
 from datetime import date
 import streamlit as st
 import streamlit.components.v1 as components
@@ -24,27 +26,15 @@ from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_by_date, update_exercise)
 from food_store import (add_food, get_food_by_date, get_food_history,
                         delete_last_food, get_daily_totals, get_food_as_text)
-import importlib
-import translations as _translations_mod
-importlib.reload(_translations_mod)
 from translations import LANGUAGES, t
 from exercise_catalog import get_catalog
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
 from googleapiclient.discovery import build as gcal_build
-import datetime as _dt
+
+from utils import calc_tdee, calc_realistic_date
 
 load_dotenv()
-
-
-def _calc_realistic_date(current_weight: float, target_weight: float) -> _dt.date | None:
-    """Возвращает реалистичную дату цели (~0.5 кг/нед для похудения, 0.3 для набора)."""
-    if not target_weight or target_weight <= 0:
-        return None
-    kg_diff = abs(current_weight - target_weight)
-    rate = 0.5 if current_weight > target_weight else 0.3
-    weeks = kg_diff / rate
-    return _dt.date.today() + _dt.timedelta(weeks=weeks)
 
 st.set_page_config(page_title="Fitness Trainer", page_icon="💪", layout="wide")
 
@@ -158,7 +148,7 @@ with st.sidebar:
         _prof["target_date"] = str(_target_date)
 
         # Кнопка "принять реалистичную дату"
-        _real_date = _calc_realistic_date(float(_prof["weight"]), float(_prof["target_weight"]))
+        _real_date = calc_realistic_date(float(_prof["weight"]), float(_prof["target_weight"]))
         if _real_date and _real_date != _target_date:
             if st.button(f"✅ {_real_date}", use_container_width=True, help=t(lang, "accept_realistic_date")):
                 _prof["target_date"] = str(_real_date)
@@ -240,21 +230,9 @@ target_weight = _prof.get("target_weight", 0.0)
 target_date = _prof.get("target_date", "")
 
 # Дневная норма калорий (Mifflin-St Jeor + коэффициент активности)
-def _calc_tdee(weight_kg: float, height_cm: float, age_yr: int,
-               goal_idx: int, level_idx: int) -> int:
-    # BMR (для мужчин; небольшая погрешность без пола — добавим позже)
-    bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age_yr + 5
-    # Коэффициент по уровню подготовки: Новичок=1.375, Средний=1.55, Продвинутый=1.725
-    activity = [1.375, 1.55, 1.725][min(level_idx, 2)]
-    tdee = bmr * activity
-    # Корректировка по цели: похудеть=-300, поддержание=0, масса=+300, выносливость=-100
-    adj = [-300, 300, 0, -100][min(goal_idx, 3)]
-    return int(tdee + adj)
-
-DAILY_KCAL = _calc_tdee(weight, height, age, _prof["goal_idx"], _prof["level_idx"])
+DAILY_KCAL = calc_tdee(weight, height, age, _prof["goal_idx"], _prof["level_idx"])
 
 # Вычисляем реалистичный темп похудения
-import datetime as _dt
 _weight_goal_info = ""
 if target_weight and target_weight > 0 and target_date:
     _kg_diff = weight - target_weight
@@ -653,9 +631,8 @@ if msg:
         )
         try:
             _ex_raw = llm_text.invoke(_ex_extract_prompt).content.strip()
-            import re as _re2, json as _json2
-            _ex_match = _re2.search(r'\[.*?\]', _ex_raw, _re2.DOTALL)
-            _exercises_found = _json2.loads(_ex_match.group()) if _ex_match else []
+            _ex_match = re.search(r'\[.*?\]', _ex_raw, re.DOTALL)
+            _exercises_found = json.loads(_ex_match.group()) if _ex_match else []
         except Exception:
             _exercises_found = []
 
@@ -792,9 +769,7 @@ with tab_diary:
         is_cardio = (w_muscle == MUSCLE_GROUPS[-1])  # последний элемент — Кардио
 
         if is_cardio:
-            CARDIO_TYPES = ["🏃 Бег", "🚴 Велосипед", "🏊 Плавание", "⛷️ Эллипсоид",
-                            "🚶 Ходьба", "🪜 Степпер", "🥊 Бокс/HIIT", "🛶 Гребля", "Другое"]
-            w_cardio_type = st.selectbox("Вид кардио", CARDIO_TYPES)
+            w_cardio_type = st.selectbox("Вид кардио", t(lang, "cardio_types"))
             w_duration = st.number_input("⏱️ Длительность (мин)", min_value=1, max_value=300, value=30)
             w_distance = st.number_input("📏 Дистанция (км)", min_value=0.0, max_value=200.0, value=0.0, step=0.1)
             w_avg_hr = st.number_input("❤️ Средний пульс (уд/мин)", min_value=0, max_value=250, value=0)
@@ -812,16 +787,17 @@ with tab_diary:
     if is_cardio and w_avg_hr > 0:
         max_hr = 220 - age
         pct = w_avg_hr / max_hr * 100
+        _hr_zones = t(lang, "hr_zones")
         if pct < 60:
-            zone, zone_name = 1, "Восстановление"
+            zone, zone_name = 1, _hr_zones[0]
         elif pct < 70:
-            zone, zone_name = 2, "Жиросжигание"
+            zone, zone_name = 2, _hr_zones[1]
         elif pct < 80:
-            zone, zone_name = 3, "Аэробная"
+            zone, zone_name = 3, _hr_zones[2]
         elif pct < 90:
-            zone, zone_name = 4, "Анаэробная"
+            zone, zone_name = 4, _hr_zones[3]
         else:
-            zone, zone_name = 5, "Максимальная"
+            zone, zone_name = 5, _hr_zones[4]
         colors = {1: "🟦", 2: "🟩", 3: "🟨", 4: "🟧", 5: "🟥"}
         st.info(f"{colors[zone]} **Зона {zone} — {zone_name}** ({pct:.0f}% от макс. пульса {max_hr})")
 
@@ -878,11 +854,9 @@ with tab_diary:
                 )
                 _parsed_raw = llm_text.invoke(_parse_prompt).content.strip()
             try:
-                import re as _re
-                import json as _json
-                _json_match = _re.search(r'\{.*\}', _parsed_raw, _re.DOTALL)
+                _json_match = re.search(r'\{.*\}', _parsed_raw, re.DOTALL)
                 if _json_match:
-                    _p = _json.loads(_json_match.group())
+                    _p = json.loads(_json_match.group())
                     if _p.get("exercise"):
                         st.session_state.diary_voice_prefill = {
                             "exercise": _p["exercise"],
@@ -1005,7 +979,6 @@ def _render_food_tab():
         _w = st.session_state.get("f_weight", 100.0)
         if not _food:
             return
-        import re as _re_af, json as _json_af
         _prompt = (
             f"Nutrition facts for '{_food}', {_w}g portion. "
             "Return ONLY JSON: {\"calories\": 0, \"protein\": 0, \"fat\": 0, \"carbs\": 0}. "
@@ -1013,9 +986,9 @@ def _render_food_tab():
         )
         try:
             _resp = llm_text.invoke(_prompt).content.strip()
-            _m = _re_af.search(r'\{.*\}', _resp, _re_af.DOTALL)
+            _m = re.search(r'\{.*\}', _resp, re.DOTALL)
             if _m:
-                _d = _json_af.loads(_m.group())
+                _d = json.loads(_m.group())
                 st.session_state["f_cal"] = float(_d.get("calories", 0))
                 st.session_state["f_prot"] = float(_d.get("protein", 0))
                 st.session_state["f_fat"] = float(_d.get("fat", 0))
@@ -1084,11 +1057,9 @@ def _render_food_tab():
                 )
                 _food_raw = llm_text.invoke(_food_parse_prompt).content.strip()
             try:
-                import re as _re2
-                import json as _json2
-                _fm = _re2.search(r'\{.*\}', _food_raw, _re2.DOTALL)
+                _fm = re.search(r'\{.*\}', _food_raw, re.DOTALL)
                 if _fm:
-                    _fp = _json2.loads(_fm.group())
+                    _fp = json.loads(_fm.group())
                     if _fp.get("food_name"):
                         add_food(name, str(f_date),
                                  _fp.get("meal_type", f_meal),
@@ -1112,26 +1083,22 @@ def _render_food_tab():
         food_photo_meal = st.selectbox(t(lang, "meal_type"), t(lang, "meal_types"), key="fphoto_meal")
         if food_photo and st.button(t(lang, "analyzing_food"), key="analyze_food_photo"):
             with st.spinner(t(lang, "analyzing_food")):
-                import base64 as _b64
                 _img_bytes = food_photo.read()
-                _b64_img = _b64.b64encode(_img_bytes).decode()
+                _b64_img = base64.b64encode(_img_bytes).decode()
                 _photo_prompt = (
                     "Analyze this food photo. Return JSON: "
                     "{\"food_name\": \"\", \"weight_g\": 0, \"calories\": 0, "
                     "\"protein\": 0, \"fat\": 0, \"carbs\": 0}. "
                     "Estimate portions from the photo. Return only valid JSON."
                 )
-                from langchain_core.messages import HumanMessage as _HM
-                _photo_resp = llm_vision.invoke([_HM(content=[
+                _photo_resp = llm_vision.invoke([HumanMessage(content=[
                     {"type": "image_url", "image_url": {"url": f"data:{food_photo.type};base64,{_b64_img}"}},
                     {"type": "text", "text": _photo_prompt},
                 ])]).content.strip()
             try:
-                import re as _re3
-                import json as _json3
-                _pm = _re3.search(r'\{.*\}', _photo_resp, _re3.DOTALL)
+                _pm = re.search(r'\{.*\}', _photo_resp, re.DOTALL)
                 if _pm:
-                    _pp = _json3.loads(_pm.group())
+                    _pp = json.loads(_pm.group())
                     if _pp.get("food_name"):
                         add_food(name, str(f_date), food_photo_meal,
                                  _pp["food_name"],
@@ -1270,14 +1237,13 @@ Program text:
 {program_text[:3000]}"""
 
     try:
-        import re as _re3, json as _json3
         _raw = llm_text.invoke(_prompt).content.strip()
         # Strip markdown code blocks if present
-        _raw = _re3.sub(r'^```(?:json)?\s*', '', _raw)
-        _raw = _re3.sub(r'\s*```$', '', _raw)
-        _m = _re3.search(r'\[.*\]', _raw, _re3.DOTALL)
+        _raw = re.sub(r'^```(?:json)?\s*', '', _raw)
+        _raw = re.sub(r'\s*```$', '', _raw)
+        _m = re.search(r'\[.*\]', _raw, re.DOTALL)
         if _m:
-            return _json3.loads(_m.group())
+            return json.loads(_m.group())
     except Exception:
         pass
     return []
