@@ -1407,29 +1407,28 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
                     _img_col, _fields_col = st.columns([0.25, 0.75])
                     with _img_col:
                         if _prev_imgs:
-                            _frames = _prev_imgs[:2]
-                            if len(_frames) == 2:
-                                import json as _jf
-                                _urls_js = _jf.dumps(_frames)
-                                components.html(f"""
-                                    <div style="border-radius:12px; overflow:hidden;
-                                                width:350px; height:350px;">
-                                        <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
-                                             style="width:350px; height:350px; object-fit:cover; display:block;">
-                                    </div>
-                                    <script>
-                                    (function(){{
-                                        var img=document.getElementById('exframe_{wi}_{edi}');
-                                        var urls={_urls_js}, i=0;
+                            _frames = _prev_imgs
+                            import json as _jf
+                            _urls_js = _jf.dumps(_frames)
+                            components.html(f"""
+                                <div style="border-radius:12px; overflow:hidden;
+                                            width:350px; height:350px;">
+                                    <img id="exframe_{wi}_{edi}" src="{_frames[0]}"
+                                         style="width:350px; height:350px; object-fit:cover; display:block;">
+                                </div>
+                                <script>
+                                (function(){{
+                                    var img=document.getElementById('exframe_{wi}_{edi}');
+                                    var urls={_urls_js}, i=0;
+                                    if(urls.length > 1) {{
                                         setInterval(function(){{
                                             i=(i+1)%urls.length;
                                             img.src=urls[i];
                                         }}, 2000);
-                                    }})();
-                                    </script>
-                                """, height=360)
-                            else:
-                                st.image(_frames[0], use_container_width=True)
+                                    }}
+                                }})();
+                                </script>
+                            """, height=360)
 
                     with _fields_col:
                         if _prev_schema:
