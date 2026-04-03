@@ -1630,4 +1630,25 @@ with tab_program:
                 # Превью содержимого
                 with st.expander(t(lang, "program_preview")):
                     _text = get_program_text(_pid)
-                    st.text(_text[:1500] + ("…" if len(_text) > 1500 else ""))
+                    _cache_k = f"prev_weeks_{_pid}"
+                    if _cache_k not in st.session_state:
+                        st.session_state[_cache_k] = _parse_program_to_calendar(_text)
+                    _prev_weeks = st.session_state[_cache_k]
+                    _day_lbl = t(lang, "week_days")
+                    _wk_lbl  = t(lang, "program_week")
+                    _rest_lbl = t(lang, "program_rest")
+                    if _prev_weeks:
+                        for _wk in _prev_weeks:
+                            st.markdown(f"**{_wk_lbl} {_wk.get('week', 1)}**")
+                            _days = {d["day"]: d for d in _wk.get("days", [])}
+                            for _di in range(7):
+                                _d = _days.get(_di, {})
+                                _exs = _d.get("exercises", [])
+                                _is_rest = _d.get("rest", True) or not _exs
+                                _dlabel = _day_lbl[_di] if _di < len(_day_lbl) else str(_di)
+                                if _is_rest:
+                                    st.markdown(f"&nbsp;&nbsp;**{_dlabel}** — 💤 {_rest_lbl}")
+                                else:
+                                    st.markdown(f"&nbsp;&nbsp;**{_dlabel}** — " + " · ".join(_exs))
+                    else:
+                        st.text(_text[:1500] + ("…" if len(_text) > 1500 else ""))
