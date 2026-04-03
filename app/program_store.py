@@ -88,3 +88,28 @@ def activate_program(user_name: str, program_id: int):
             "UPDATE training_programs SET is_active=1 WHERE id=? AND user_name=?",
             (program_id, user_name)
         )
+
+
+def delete_program(user_name: str, program_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "DELETE FROM training_programs WHERE id=? AND user_name=?",
+            (program_id, user_name)
+        )
+
+
+def rename_program(program_id: int, new_title: str):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "UPDATE training_programs SET title=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (new_title.strip(), program_id)
+        )
+
+
+def get_program_text(program_id: int) -> str:
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT raw_text FROM training_programs WHERE id=?",
+            (program_id,)
+        ).fetchone()
+    return row[0] if row else ""

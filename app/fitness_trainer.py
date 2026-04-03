@@ -20,7 +20,8 @@ from groq import Groq
 from memory_store import load_messages, save_message, clear_history, save_language, load_language, save_profile, load_profile
 from muscle_diagram import get_muscle_html
 from program_store import (save_program, get_active_program, get_all_programs,
-                           activate_program, update_program_text)
+                           activate_program, update_program_text,
+                           delete_program, rename_program, get_program_text)
 from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_as_text, delete_last_exercise,
                            get_workouts_by_date, update_exercise)
@@ -1566,17 +1567,67 @@ with tab_program:
         st.info(f"💬 {t(lang, 'program_chat_hint')}", icon="🤖")
 
     # История программ
-    if len(all_progs) > 1:
+    if all_progs:
         st.divider()
         st.subheader(t(lang, "program_history"))
         for p in all_progs:
-            _active_mark = "✅ " if p["is_active"] else ""
-            col_lbl, col_btn = st.columns([0.75, 0.25])
-            with col_lbl:
-                st.markdown(f"{_active_mark}**{p['title']}** — {p['created_at'][:10]}")
-            with col_btn:
-                if not p["is_active"]:
-                    if st.button(t(lang, "program_activate"), key=f"act_{p['id']}",
+            _pid = p["id"]
+            _is_active = bool(p["is_active"])
+            _rename_key = f"renaming_{_pid}"
+            _del_key = f"deleting_{_pid}"
+
+            with st.container(border=True):
+                # Заголовок
+                _mark = "✅ " if _is_active else ""
+                c_title, c_act, c_ren, c_del = st.columns([0.5, 0.17, 0.17, 0.16])
+                with c_title:
+                    st.markdown(f"{_mark}**{p['title']}**  \n{p['created_at'][:10]}")
+                with c_act:
+                    if not _is_active:
+                        if st.button(t(lang, "program_activate"), key=f"act_{_pid}",
+                                     use_container_width=True):
+                            activate_program(name, _pid)
+                            st.rerun()
+                with c_ren:
+                    if st.button("✏️ " + t(lang, "program_rename"), key=f"ren_btn_{_pid}",
                                  use_container_width=True):
-                        activate_program(name, p["id"])
+                        st.session_state[_rename_key] = not st.session_state.get(_rename_key, False)
                         st.rerun()
+                with c_del:
+                    if not _is_active:
+                        if st.button("🗑️ " + t(lang, "program_delete"), key=f"del_btn_{_pid}",
+                                     use_container_width=True):
+                            st.session_state[_del_key] = True
+                            st.rerun()
+
+                # Переименование
+                if st.session_state.get(_rename_key):
+                    _new_name = st.text_input(
+                        t(lang, "program_rename"), value=p["title"],
+                        placeholder=t(lang, "program_rename_placeholder"),
+                        key=f"ren_input_{_pid}", label_visibility="collapsed"
+                    )
+                    if st.button("💾 " + t(lang, "btn_save"), key=f"ren_save_{_pid}"):
+                        if _new_name.strip():
+                            rename_program(_pid, _new_name.strip())
+                        st.session_state.pop(_rename_key, None)
+                        st.rerun()
+
+                # Подтверждение удаления
+                if st.session_state.get(_del_key):
+                    st.warning(t(lang, "program_delete_confirm"))
+                    _dc1, _dc2 = st.columns(2)
+                    with _dc1:
+                        if st.button("✅ Да", key=f"del_yes_{_pid}", use_container_width=True):
+                            delete_program(name, _pid)
+                            st.session_state.pop(_del_key, None)
+                            st.rerun()
+                    with _dc2:
+                        if st.button("❌ Нет", key=f"del_no_{_pid}", use_container_width=True):
+                            st.session_state.pop(_del_key, None)
+                            st.rerun()
+
+                # Превью содержимого
+                with st.expander(t(lang, "program_preview")):
+                    _text = get_program_text(_pid)
+                    st.text(_text[:1500] + ("…" if len(_text) > 1500 else ""))
