@@ -584,47 +584,41 @@ If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}
 
 
 # ============================================================
-# ОПРЕДЕЛЕНИЕ АКТИВНОЙ ВКЛАДКИ через JS → query param
+# ВКЛАДКИ — надёжное определение через session_state
 # ============================================================
-components.html("""<script>
-(function() {
-    function syncTab() {
-        try {
-            var tabs = window.parent.document.querySelectorAll('[role="tab"]');
-            var idx = 0;
-            tabs.forEach(function(tab, i) {
-                if (tab.getAttribute('aria-selected') === 'true') idx = i;
-            });
-            var url = new URL(window.parent.location.href);
-            if (url.searchParams.get('_t') !== String(idx)) {
-                url.searchParams.set('_t', String(idx));
-                window.parent.history.replaceState(null, '', url.toString());
-            }
-        } catch(e) {}
-    }
-    window.parent.document.addEventListener('click', function(e) {
-        if (e.target.closest('[role="tab"]')) { syncTab(); }
-    }, true);
-    syncTab();
-})();
-</script>""", height=0)
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "chat"
 
-_TAB_NAMES = ["chat", "diary", "food", "analysis", "program"]
-_t_raw = st.query_params.get("_t", "0")
-_active_tab = _TAB_NAMES[int(_t_raw)] if _t_raw.isdigit() and int(_t_raw) < len(_TAB_NAMES) else "chat"
+_TAB_KEYS   = ["chat", "diary", "food", "analysis", "program"]
+_TAB_LABELS = [t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"),
+               t(lang, "tab_analysis"), t(lang, "tab_program")]
 
-# ============================================================
-# ВКЛАДКИ
-# ============================================================
-tab_chat, tab_diary, tab_food, tab_analysis, tab_program = st.tabs([
-    t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"),
-    t(lang, "tab_analysis"), t(lang, "tab_program")
-])
+st.markdown("""<style>
+div[data-testid="stHorizontalBlock"] { margin-bottom: -1rem; }
+.tab-radio > div { flex-direction: row !important; gap: 0 !important;
+                   border-bottom: 1px solid #e6e6e6; margin-bottom: 1rem; }
+.tab-radio label { padding: 0.5rem 1.1rem !important; border-bottom: 2px solid transparent !important;
+                   margin-bottom: -1px !important; font-size: 0.875rem !important;
+                   border-radius: 0 !important; }
+.tab-radio label[data-checked="true"] { border-bottom-color: #FF4B4B !important;
+                                         color: #FF4B4B !important; font-weight: 600 !important; }
+</style>""", unsafe_allow_html=True)
+
+_cur_idx = _TAB_KEYS.index(st.session_state.active_tab) if st.session_state.active_tab in _TAB_KEYS else 0
+with st.container():
+    st.markdown('<div class="tab-radio">', unsafe_allow_html=True)
+    _selected_label = st.radio("", _TAB_LABELS, index=_cur_idx,
+                                horizontal=True, label_visibility="collapsed",
+                                key="tab_radio")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+_active_tab = _TAB_KEYS[_TAB_LABELS.index(_selected_label)]
+st.session_state.active_tab = _active_tab
 
 # ============================================================
 # ВКЛАДКА 1: ЧАТ
 # ============================================================
-with tab_chat:
+if _active_tab == "chat":
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             if msg.get("image"):
@@ -776,7 +770,7 @@ if st.session_state.get("detected_exercise", {}).get("exercise"):
 # ============================================================
 # ВКЛАДКА 2: ДНЕВНИК
 # ============================================================
-with tab_diary:
+elif _active_tab == "diary":
     st.subheader(t(lang, "record_workout"))
 
     # Предзаполнение из голоса
@@ -1250,13 +1244,13 @@ def _render_food_tab():
     else:
         st.info(t(lang, "no_food"))
 
-with tab_food:
+if _active_tab == "food":
     _render_food_tab()
 
 # ============================================================
 # ВКЛАДКА 4: АНАЛИЗ
 # ============================================================
-with tab_analysis:
+if _active_tab == "analysis":
     st.subheader(t(lang, "analysis_title"))
     workouts_text = get_workouts_as_text(name, limit=50)
     muscle_summary = get_muscle_summary(name)
@@ -1633,7 +1627,7 @@ def _render_program_calendar(weeks: list, lang_code: str, prog_id: int, cache_ke
             st.divider()
 
 
-with tab_program:
+if _active_tab == "program":
     st.subheader(t(lang, "tab_program"))
 
     active = get_active_program(name)
