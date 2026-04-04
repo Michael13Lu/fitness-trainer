@@ -27,7 +27,7 @@ from workout_store import (add_exercise, get_workouts, get_muscle_summary,
                            get_workouts_by_date, update_exercise)
 from food_store import (add_food, get_food_by_date, get_food_history,
                         delete_last_food, get_daily_totals, get_food_as_text)
-from translations import LANGUAGES, t
+from translations import LANGUAGES, T, t
 from exercise_catalog import get_catalog
 from google_calendar import (is_configured, get_auth_url, exchange_code,
                               creds_to_dict, creds_from_dict)
@@ -1239,7 +1239,80 @@ with tab_analysis:
 # ВКЛАДКА 5: ПРОГРАММА ТРЕНИРОВОК
 # ============================================================
 def _parse_program_to_calendar(program_text: str) -> list[dict]:
-    """Ask LLM to parse program into weeks × days structure."""
+    """Parse program text into weeks × days structure.
+    First tries a fast regex-based parser (works for text produced by _weeks_to_text).
+    Falls back to LLM for free-form text.
+    """
+    # Collect all known day labels and rest labels from all languages
+    _all_day_labels: list[tuple[int, str]] = []  # (day_index, label)
+    _rest_labels: set[str] = set()
+    for _lc in T.values():
+        for _i, _lbl in enumerate(_lc.get("week_days", [])):
+            _all_day_labels.append((_i, _lbl))
+        for _lbl in _lc.get("week_days_full", []):
+            _all_day_labels.append((_all_day_labels[-1][0] if _all_day_labels else 0, _lbl))
+        _rest_labels.add(_lc.get("rest_day", ""))
+        _rest_labels.add(_lc.get("program_rest", ""))
+    _rest_labels.discard("")
+
+    # Collect week-header keywords
+    _week_keywords = set()
+    for _lc in T.values():
+        _wk = _lc.get("program_week", "")
+        if _wk:
+            _week_keywords.add(_wk)
+
+    # Build day-label → index map (longest labels first to avoid prefix collisions)
+    _label_to_idx: dict[str, int] = {}
+    for _i, _lbl in sorted(_all_day_labels, key=lambda x: -len(x[1])):
+        _label_to_idx[_lbl] = _i
+
+    # Try regex parse
+    try:
+        _weeks_out: list[dict] = []
+        _current_week: dict | None = None
+        _week_num = 0
+        _week_pat = re.compile(
+            r'^\s*(?:' + '|'.join(re.escape(k) for k in _week_keywords) + r')\s+(\d+)\s*:',
+            re.IGNORECASE
+        )
+        _day_pat = re.compile(
+            r'^\s*(' + '|'.join(re.escape(l) for l in sorted(_label_to_idx, key=lambda x: -len(x))) + r')\s*:\s*(.*)',
+            re.IGNORECASE
+        )
+        for _line in program_text.splitlines():
+            _wm = _week_pat.match(_line)
+            if _wm:
+                _week_num = int(_wm.group(1))
+                _current_week = {"week": _week_num, "days": [{"day": d, "exercises": [], "rest": True} for d in range(7)]}
+                _weeks_out.append(_current_week)
+                continue
+            _dm = _day_pat.match(_line)
+            if _dm:
+                if _current_week is None:
+                    _week_num += 1
+                    _current_week = {"week": _week_num, "days": [{"day": d, "exercises": [], "rest": True} for d in range(7)]}
+                    _weeks_out.append(_current_week)
+                _lbl = _dm.group(1)
+                _content = _dm.group(2).strip()
+                _day_idx = _label_to_idx.get(_lbl) or _label_to_idx.get(_lbl.capitalize()) or next(
+                    (v for k, v in _label_to_idx.items() if k.lower() == _lbl.lower()), None
+                )
+                if _day_idx is None:
+                    continue
+                _is_rest = _content in _rest_labels or not _content
+                if _is_rest:
+                    _current_week["days"][_day_idx] = {"day": _day_idx, "exercises": [], "rest": True}
+                else:
+                    # Split comma-separated exercises
+                    _exs = [e.strip() for e in _content.split(",") if e.strip()]
+                    _current_week["days"][_day_idx] = {"day": _day_idx, "exercises": _exs, "rest": False}
+        if _weeks_out:
+            return _weeks_out
+    except Exception:
+        pass
+
+    # Fallback: LLM parser
     _prompt = f"""You are a JSON converter. Parse this training program into structured JSON.
 
 Return ONLY a valid JSON array with this exact structure:
@@ -1260,7 +1333,8 @@ Return ONLY a valid JSON array with this exact structure:
 
 Rules:
 - days array must always have exactly 7 elements (Mon=0 to Sun=6)
-- exercises: copy the exercise strings EXACTLY as written in the original text — do NOT translate, do NOT rename, do NOT change language
+- exercises: if multiple exercises are listed on one line separated by commas, put EACH ONE as a separate string in the array
+- exercises: copy the exercise strings EXACTLY as written — do NOT translate, do NOT rename, do NOT change language
 - rest: true if no training that day
 - If program has no explicit weeks, treat it as week 1
 - Output ONLY the JSON array, no markdown, no explanation
@@ -1270,7 +1344,6 @@ Program text:
 
     try:
         _raw = llm_text.invoke(_prompt).content.strip()
-        # Strip markdown code blocks if present
         _raw = re.sub(r'^```(?:json)?\s*', '', _raw)
         _raw = re.sub(r'\s*```$', '', _raw)
         _m = re.search(r'\[.*\]', _raw, re.DOTALL)
