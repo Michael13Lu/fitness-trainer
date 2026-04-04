@@ -85,7 +85,7 @@ if "sidebar_section" not in st.session_state:
 
 _PROFILE_DEFAULTS = {
     "name": "Михаил", "age": 25, "weight": 75, "height": 175,
-    "goal_idx": 0, "level_idx": 0, "style_idx": 0,
+    "gender_idx": 0, "goal_idx": 0, "level_idx": 0, "style_idx": 0,
     "target_weight": 0.0, "target_date": "",
 }
 
@@ -123,6 +123,9 @@ with st.sidebar:
     # ── Профиль ──────────────────────────────────────────────
     if st.session_state.sidebar_section == "profile":
         _prof["name"] = st.text_input(t(lang, "name"), value=_prof["name"])
+        genders_list = t(lang, "genders")
+        _prof["gender_idx"] = min(_prof.get("gender_idx", 0), len(genders_list) - 1)
+        _prof["gender_idx"] = genders_list.index(st.selectbox(t(lang, "gender"), genders_list, index=_prof["gender_idx"]))
         _prof["age"] = st.number_input(t(lang, "age"), min_value=10, max_value=100, value=_prof["age"])
         _prof["weight"] = st.number_input(t(lang, "weight"), min_value=30, max_value=200, value=_prof["weight"])
         _prof["height"] = st.number_input(t(lang, "height"), min_value=100, max_value=250, value=_prof["height"])
@@ -220,6 +223,7 @@ name = _prof["name"]
 age = _prof["age"]
 weight = _prof["weight"]
 height = _prof["height"]
+gender = t("en", "genders")[_prof.get("gender_idx", 0)]
 goal = t(lang, "goals")[_prof["goal_idx"]]
 level = t(lang, "levels")[_prof["level_idx"]]
 trainer_style = t(lang, "styles")[_prof["style_idx"]]
@@ -311,6 +315,7 @@ system_prompt = """You are a personal fitness trainer and nutritionist.
 Client info:
 - Name: {name}
 - Age: {age}
+- Gender: {gender}
 - Weight: {weight} kg, Height: {height} cm
 - Goal: {goal}
 - Fitness level: {level}
@@ -425,7 +430,7 @@ def get_chain_input(user_input: str) -> dict:
     else:
         _prog_info = ""
     return {
-        "name": name, "age": age, "weight": weight, "height": height,
+        "name": name, "age": age, "gender": gender, "weight": weight, "height": height,
         "goal": goal, "level": level, "trainer_style": trainer_style,
         "weight_goal_info": _weight_goal_info,
         "active_program_info": _prog_info,
