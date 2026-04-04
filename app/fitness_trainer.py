@@ -105,7 +105,7 @@ if "sidebar_video_id" not in st.session_state:
 with st.sidebar:
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        if st.button(t(lang, "profile"), use_container_width=True):
+        if st.button("👤", use_container_width=True):
             st.session_state.sidebar_section = "profile"
     with c2:
         if st.button("🔊", use_container_width=True):
