@@ -367,6 +367,13 @@ _TAB_INSTRUCTIONS = {
         "Explain why each exercise or change is recommended. "
         "Do NOT discuss unrelated topics unless directly asked."
     ),
+    "workout": (
+        "CURRENT CONTEXT: Live workout session. "
+        "The user is actively working out right now. "
+        "Be brief, motivating, and direct. Answer questions about technique, breathing, or exercise execution. "
+        "If asked to swap an exercise, suggest a quick alternative for the same muscle group. "
+        "Do NOT give long explanations. The user is mid-workout."
+    ),
 }
 
 prompt = ChatPromptTemplate.from_messages([
@@ -589,9 +596,9 @@ If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "chat"
 
-_TAB_KEYS   = ["chat", "diary", "food", "analysis", "program"]
+_TAB_KEYS   = ["chat", "diary", "food", "analysis", "program", "workout"]
 _TAB_LABELS = [t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"),
-               t(lang, "tab_analysis"), t(lang, "tab_program")]
+               t(lang, "tab_analysis"), t(lang, "tab_program"), t(lang, "tab_workout")]
 
 st.markdown("""<style>
 div[data-testid="stHorizontalBlock"] { margin-bottom: -1rem; }
@@ -1809,3 +1816,263 @@ if _active_tab == "program":
                                     st.markdown(f"&nbsp;&nbsp;**{_dlabel}** — " + " · ".join(_exs))
                     else:
                         st.text(_text[:1500] + ("…" if len(_text) > 1500 else ""))
+
+# ============================================================
+# ВКЛАДКА 6: ТРЕНИРОВКА (Live session)
+# ============================================================
+if _active_tab == "workout":
+    import time as _time
+
+    # ── session state init ───────────────────────────────────
+    def _wk_init():
+        if "wk_exercises" not in st.session_state:
+            st.session_state.wk_exercises = []   # [{name, sets, reps, weight, rest}]
+        if "wk_started" not in st.session_state:
+            st.session_state.wk_started = False
+        if "wk_start_ts" not in st.session_state:
+            st.session_state.wk_start_ts = None
+        if "wk_ex_idx" not in st.session_state:
+            st.session_state.wk_ex_idx = 0
+        if "wk_set_idx" not in st.session_state:
+            st.session_state.wk_set_idx = 0
+        if "wk_resting" not in st.session_state:
+            st.session_state.wk_resting = False
+        if "wk_rest_end" not in st.session_state:
+            st.session_state.wk_rest_end = None
+        if "wk_done_sets" not in st.session_state:
+            st.session_state.wk_done_sets = set()  # set of (ex_idx, set_idx)
+        if "wk_finished" not in st.session_state:
+            st.session_state.wk_finished = False
+
+    _wk_init()
+    _wk = st.session_state
+
+    st.subheader(t(lang, "workout_title"))
+
+    # ── ФАЗА 1: Подготовка (не начата) ──────────────────────
+    if not _wk.wk_started:
+        _active_prog = get_active_program(name)
+        _day_options = {}
+
+        # Собираем дни из активной программы
+        if _active_prog:
+            _prog_cache = f"wk_prog_weeks_{_active_prog['id']}"
+            if _prog_cache not in st.session_state:
+                with st.spinner(t(lang, "thinking")):
+                    st.session_state[_prog_cache] = _parse_program_to_calendar(_active_prog["raw_text"])
+            _prog_weeks = st.session_state.get(_prog_cache, [])
+            _wday_labels = t(lang, "week_days")
+            for _wk_data in _prog_weeks:
+                for _day in _wk_data.get("days", []):
+                    if not _day.get("rest") and _day.get("exercises"):
+                        _wk_num = _wk_data.get("week", 1)
+                        _di = _day.get("day", 0)
+                        _label = f"Неделя {_wk_num} · {_wday_labels[_di] if _di < len(_wday_labels) else _di}"
+                        _day_options[_label] = _day["exercises"]
+
+        _col_sel, _col_rest = st.columns([2, 1])
+        with _col_sel:
+            _source_options = [t(lang, "workout_custom")] + list(_day_options.keys())
+            _source = st.selectbox(t(lang, "workout_select_day"), _source_options, key="wk_source")
+        with _col_rest:
+            _rest_default = st.number_input(t(lang, "workout_rest_timer"), min_value=10, max_value=300,
+                                             value=60, step=5, key="wk_rest_default_input")
+
+        # Список упражнений для редактирования
+        if _source != t(lang, "workout_custom") and _source in _day_options:
+            # Заполнить из программы
+            if st.session_state.get("wk_last_source") != _source:
+                st.session_state.wk_exercises = [
+                    {"name": _ex, "sets": 3, "reps": 10, "weight": 0.0, "rest": _rest_default}
+                    for _ex in _day_options[_source]
+                ]
+                st.session_state.wk_last_source = _source
+
+        st.markdown("**Упражнения:**")
+        _to_remove = []
+        for _ei, _ex in enumerate(st.session_state.wk_exercises):
+            _c1, _c2, _c3, _c4, _c5, _c6 = st.columns([3, 1, 1, 1, 1, 0.5])
+            with _c1:
+                st.session_state.wk_exercises[_ei]["name"] = st.text_input(
+                    "Упражнение", value=_ex["name"], key=f"wex_name_{_ei}", label_visibility="collapsed")
+            with _c2:
+                st.session_state.wk_exercises[_ei]["sets"] = st.number_input(
+                    t(lang, "workout_sets_label"), value=_ex["sets"], min_value=1, max_value=20,
+                    key=f"wex_sets_{_ei}", label_visibility="collapsed")
+            with _c3:
+                st.session_state.wk_exercises[_ei]["reps"] = st.number_input(
+                    t(lang, "workout_reps_label"), value=_ex["reps"], min_value=1, max_value=200,
+                    key=f"wex_reps_{_ei}", label_visibility="collapsed")
+            with _c4:
+                st.session_state.wk_exercises[_ei]["weight"] = st.number_input(
+                    t(lang, "workout_weight_label"), value=float(_ex["weight"]), min_value=0.0,
+                    key=f"wex_wt_{_ei}", label_visibility="collapsed")
+            with _c5:
+                st.session_state.wk_exercises[_ei]["rest"] = st.number_input(
+                    t(lang, "workout_rest_default"), value=int(_ex.get("rest", _rest_default)),
+                    min_value=10, max_value=300, step=5,
+                    key=f"wex_rest_{_ei}", label_visibility="collapsed")
+            with _c6:
+                if st.button("🗑️", key=f"wex_del_{_ei}"):
+                    _to_remove.append(_ei)
+
+        for _ri in reversed(_to_remove):
+            st.session_state.wk_exercises.pop(_ri)
+            st.rerun()
+
+        if st.button(f"➕ {t(lang, 'workout_add_ex')}", use_container_width=False):
+            st.session_state.wk_exercises.append(
+                {"name": "", "sets": 3, "reps": 10, "weight": 0.0, "rest": _rest_default})
+            st.rerun()
+
+        st.divider()
+        if st.session_state.wk_exercises and st.button(t(lang, "workout_start"),
+                                                         use_container_width=True, type="primary"):
+            st.session_state.wk_started = True
+            st.session_state.wk_start_ts = _time.time()
+            st.session_state.wk_ex_idx = 0
+            st.session_state.wk_set_idx = 0
+            st.session_state.wk_resting = False
+            st.session_state.wk_rest_end = None
+            st.session_state.wk_done_sets = set()
+            st.session_state.wk_finished = False
+            st.rerun()
+        elif not st.session_state.wk_exercises:
+            st.info(t(lang, "workout_no_program"))
+
+    # ── ФАЗА 2: Тренировка идёт ─────────────────────────────
+    elif _wk.wk_started and not _wk.wk_finished:
+        _exercises = _wk.wk_exercises
+        _ei = _wk.wk_ex_idx
+        _si = _wk.wk_set_idx
+
+        # Проверка — всё выполнено
+        if _ei >= len(_exercises):
+            st.session_state.wk_finished = True
+            st.rerun()
+
+        _cur_ex = _exercises[_ei]
+        _total_sets = _cur_ex["sets"]
+        _rest_secs = int(_cur_ex.get("rest", 60))
+
+        # Секундомер
+        _elapsed = int(_time.time() - _wk.wk_start_ts)
+        _h, _rem = divmod(_elapsed, 3600)
+        _m, _s = divmod(_rem, 60)
+        _stopwatch_str = f"{_h:02d}:{_m:02d}:{_s:02d}" if _h else f"{_m:02d}:{_s:02d}"
+
+        # Прогресс по упражнениям
+        _total_ex = len(_exercises)
+        st.progress((_ei) / _total_ex)
+
+        # Заголовок
+        _hcol1, _hcol2 = st.columns([3, 1])
+        with _hcol1:
+            st.markdown(f"### {_cur_ex['name']}")
+            st.caption(f"{t(lang, 'workout_set')} **{_si + 1}** {t(lang, 'workout_of')} **{_total_sets}**"
+                       f"  ·  {_cur_ex['reps']} повт."
+                       + (f"  ·  {_cur_ex['weight']:.1f} кг" if _cur_ex['weight'] > 0 else ""))
+        with _hcol2:
+            st.markdown(f"### ⏱ {_stopwatch_str}")
+            st.caption(t(lang, "workout_stopwatch"))
+
+        # Список подходов текущего упражнения
+        st.markdown("---")
+        for _s_i in range(_total_sets):
+            _done = (_ei, _s_i) in _wk.wk_done_sets
+            _is_current = (_s_i == _si)
+            if _done:
+                st.markdown(f"✅ ~~{t(lang, 'workout_set')} {_s_i + 1}~~")
+            elif _is_current:
+                st.markdown(f"▶️ **{t(lang, 'workout_set')} {_s_i + 1}** — {_cur_ex['reps']} повт."
+                            + (f" @ {_cur_ex['weight']:.1f} кг" if _cur_ex['weight'] > 0 else ""))
+            else:
+                st.markdown(f"⬜ {t(lang, 'workout_set')} {_s_i + 1}")
+
+        st.markdown("---")
+
+        # ТАЙМЕР ОТДЫХА
+        if _wk.wk_resting and _wk.wk_rest_end:
+            _remaining = int(_wk.wk_rest_end - _time.time())
+            if _remaining <= 0:
+                st.session_state.wk_resting = False
+                st.session_state.wk_rest_end = None
+                st.rerun()
+            else:
+                _rm, _rs = divmod(_remaining, 60)
+                st.info(f"💤 {t(lang, 'workout_rest_label')} **{_rm:02d}:{_rs:02d}**")
+                _rc1, _rc2 = st.columns(2)
+                with _rc1:
+                    if st.button(t(lang, "workout_skip_rest"), use_container_width=True):
+                        st.session_state.wk_resting = False
+                        st.session_state.wk_rest_end = None
+                        st.rerun()
+                with _rc2:
+                    st.button("🔄", help="Обновить таймер", use_container_width=True)
+                # Авто-обновление каждую секунду
+                st.markdown(f'<meta http-equiv="refresh" content="1">', unsafe_allow_html=True)
+
+        else:
+            # Кнопка выполнения подхода
+            _btn_label = (t(lang, "workout_next_ex")
+                          if _si + 1 >= _total_sets
+                          else t(lang, "workout_next_set"))
+
+            if st.button(f"✅ {t(lang, 'workout_done')} — {_btn_label}",
+                         use_container_width=True, type="primary"):
+                st.session_state.wk_done_sets.add((_ei, _si))
+
+                if _si + 1 >= _total_sets:
+                    # Упражнение завершено — переход к следующему
+                    st.session_state.wk_ex_idx += 1
+                    st.session_state.wk_set_idx = 0
+                    if _wk.wk_ex_idx < len(_exercises):
+                        st.session_state.wk_resting = True
+                        st.session_state.wk_rest_end = _time.time() + _rest_secs
+                else:
+                    # Следующий подход
+                    st.session_state.wk_set_idx += 1
+                    st.session_state.wk_resting = True
+                    st.session_state.wk_rest_end = _time.time() + _rest_secs
+                st.rerun()
+
+        # Список всех упражнений (обзор)
+        with st.expander("📋 Все упражнения", expanded=False):
+            for _i, _ex in enumerate(_exercises):
+                _all_done = all((_i, _ss) in _wk.wk_done_sets for _ss in range(_ex["sets"]))
+                _icon = "✅" if _all_done else ("▶️" if _i == _ei else "⬜")
+                st.markdown(f"{_icon} **{_ex['name']}** — {_ex['sets']}×{_ex['reps']}"
+                            + (f" @ {_ex['weight']:.1f}кг" if _ex['weight'] > 0 else ""))
+
+        # Кнопка досрочного завершения
+        if st.button(f"🏁 {t(lang, 'workout_finish')}", use_container_width=False):
+            st.session_state.wk_finished = True
+            st.rerun()
+
+    # ── ФАЗА 3: Тренировка завершена ────────────────────────
+    elif _wk.wk_finished:
+        _elapsed = int(_time.time() - (_wk.wk_start_ts or _time.time()))
+        _h, _rem = divmod(_elapsed, 3600)
+        _m, _s = divmod(_rem, 60)
+        _time_str = f"{_h:02d}:{_m:02d}:{_s:02d}" if _h else f"{_m:02d}:{_s:02d}"
+
+        st.success(t(lang, "workout_complete_msg"))
+        st.markdown(f"### ⏱ {_time_str}")
+        st.caption(t(lang, "workout_stopwatch"))
+
+        st.subheader(t(lang, "workout_summary"))
+        _done_count = 0
+        for _i, _ex in enumerate(_wk.wk_exercises):
+            _sets_done = sum(1 for _ss in range(_ex["sets"]) if (_i, _ss) in _wk.wk_done_sets)
+            _done_count += _sets_done
+            _icon = "✅" if _sets_done == _ex["sets"] else "⚠️"
+            st.markdown(f"{_icon} **{_ex['name']}** — {_sets_done}/{_ex['sets']} подходов"
+                        + (f" @ {_ex['weight']:.1f}кг" if _ex['weight'] > 0 else ""))
+
+        st.divider()
+        if st.button("🔄 Новая тренировка", use_container_width=True):
+            for _k in ["wk_started", "wk_start_ts", "wk_ex_idx", "wk_set_idx",
+                       "wk_resting", "wk_rest_end", "wk_done_sets", "wk_finished",
+                       "wk_exercises", "wk_last_source"]:
+                st.session_state.pop(_k, None)
+            st.rerun()
