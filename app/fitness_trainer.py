@@ -333,10 +333,14 @@ _TAB_INSTRUCTIONS = {
     ),
     "diary": (
         "CURRENT CONTEXT: Workout diary. "
-        "Focus exclusively on training. When the client sends a photo, identify which muscle groups are being worked and assess form/technique. "
-        "Recommend specific exercises for targeted muscle groups. "
-        "Analyze training volume and intensity. Track progress across sessions. "
-        "Do NOT discuss nutrition or unrelated topics unless directly asked."
+        "YOUR ONLY JOB HERE IS TO ANALYZE WORKOUTS. Nothing else. "
+        "If the client sends a photo: immediately identify (1) what exercise is shown, "
+        "(2) exactly which muscle groups are targeted (primary and secondary), "
+        "(3) assess the technique/form visible in the photo, "
+        "(4) give 2-3 specific technique tips. "
+        "Do NOT greet with 'Привет' or the client's name. Do NOT discuss the training program, nutrition, goals, or general advice. "
+        "Do NOT give motivational speeches. "
+        "Go straight to the photo analysis. Be concise and specific."
     ),
     "food": (
         "CURRENT CONTEXT: Nutrition log. "
