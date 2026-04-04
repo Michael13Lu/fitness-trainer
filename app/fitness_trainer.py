@@ -528,20 +528,30 @@ def speak(text: str):
     components.html(js, height=0)
 
 
-_DEFAULT_IMAGE_PROMPT = (
-    "Analyze this exercise photo strictly. "
-    "1) Identify the exercise shown. "
-    "2) List the primary and secondary muscle groups targeted. "
-    "3) Evaluate the technique visible in the photo — what is correct and what can be improved. "
-    "4) Give 2-3 specific, actionable technique tips. "
-    "Do NOT greet the user. Do NOT discuss nutrition, goals, or training programs. "
-    "Go straight to the analysis. Be concise and specific."
-)
+_IMAGE_PROMPTS = {
+    "food": (
+        "Analyze this food photo. "
+        "1) Identify the dish or product shown. "
+        "2) Estimate the portion size in grams. "
+        "3) Calculate approximate calories, protein (g), fat (g), carbs (g). "
+        "Do NOT mention exercises or training. Be concise."
+    ),
+    "default": (
+        "Analyze this exercise photo strictly. "
+        "1) Identify the exercise shown. "
+        "2) List the primary and secondary muscle groups targeted. "
+        "3) Evaluate the technique visible — what is correct and what needs improvement. "
+        "4) Give 2-3 specific, actionable technique tips. "
+        "Do NOT greet the user. Do NOT discuss nutrition, goals, or programs. "
+        "Go straight to the analysis. Be concise and specific."
+    ),
+}
 
 def analyze_with_image(image_bytes: bytes, mime_type: str, user_text: str) -> str:
     b64 = base64.b64encode(image_bytes).decode("utf-8")
     _lang_note = t(lang, "system_prompt_lang")
-    _prompt = user_text or f"{_DEFAULT_IMAGE_PROMPT} {_lang_note}"
+    _base_prompt = _IMAGE_PROMPTS.get(_active_tab, _IMAGE_PROMPTS["default"])
+    _prompt = user_text or f"{_base_prompt} {_lang_note}"
     messages = [
         SystemMessage(content=get_system_text()),
         HumanMessage(content=[
