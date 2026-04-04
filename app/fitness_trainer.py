@@ -540,11 +540,13 @@ _DEFAULT_IMAGE_PROMPT = (
 
 def analyze_with_image(image_bytes: bytes, mime_type: str, user_text: str) -> str:
     b64 = base64.b64encode(image_bytes).decode("utf-8")
+    _lang_note = t(lang, "system_prompt_lang")
+    _prompt = user_text or f"{_DEFAULT_IMAGE_PROMPT} {_lang_note}"
     messages = [
         SystemMessage(content=get_system_text()),
         HumanMessage(content=[
             {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
-            {"type": "text", "text": user_text or _DEFAULT_IMAGE_PROMPT},
+            {"type": "text", "text": _prompt},
         ]),
     ]
     return llm_vision.invoke(messages).content
