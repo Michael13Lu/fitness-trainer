@@ -596,9 +596,9 @@ If no exercise machine in photo — return {{"exercise": "", "muscle_group": ""}
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "chat"
 
-_TAB_KEYS   = ["chat", "diary", "food", "analysis", "program", "workout"]
-_TAB_LABELS = [t(lang, "tab_chat"), t(lang, "tab_diary"), t(lang, "tab_food"),
-               t(lang, "tab_analysis"), t(lang, "tab_program"), t(lang, "tab_workout")]
+_TAB_KEYS   = ["chat", "workout", "diary", "program", "food", "analysis"]
+_TAB_LABELS = [t(lang, "tab_chat"), t(lang, "tab_workout"), t(lang, "tab_diary"),
+               t(lang, "tab_program"), t(lang, "tab_food"), t(lang, "tab_analysis")]
 
 st.markdown("""<style>
 div[data-testid="stHorizontalBlock"] { margin-bottom: -1rem; }
