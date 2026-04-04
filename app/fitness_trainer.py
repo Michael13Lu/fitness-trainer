@@ -528,13 +528,30 @@ def speak(text: str):
     components.html(js, height=0)
 
 
+_IMAGE_DEFAULTS = {
+    "diary": (
+        "Look at this exercise photo. "
+        "1) Name the exercise shown. "
+        "2) List primary and secondary muscles targeted. "
+        "3) Assess the technique visible — what is done well and what needs correction. "
+        "4) Give 2-3 specific technique tips. "
+        "Be concise and direct. No greetings, no general advice."
+    ),
+    "food": (
+        "Analyze this food photo. "
+        "Identify what is shown, estimate portion size, and calculate approximate calories, protein, fat, and carbs. "
+        "Be concise."
+    ),
+}
+
 def analyze_with_image(image_bytes: bytes, mime_type: str, user_text: str) -> str:
     b64 = base64.b64encode(image_bytes).decode("utf-8")
+    _default = _IMAGE_DEFAULTS.get(_active_tab, "Analyze this photo and give advice based on my profile.")
     messages = [
         SystemMessage(content=get_system_text()),
         HumanMessage(content=[
             {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
-            {"type": "text", "text": user_text or "Analyze this photo and give advice based on my profile."},
+            {"type": "text", "text": user_text or _default},
         ]),
     ]
     return llm_vision.invoke(messages).content
