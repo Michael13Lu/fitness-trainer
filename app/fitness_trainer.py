@@ -322,11 +322,48 @@ Client info:
 - Your communication style: {trainer_style}
 {weight_goal_info}
 {active_program_info}
-Give specific advice on training and nutrition based on the client's profile.
-When building a program, respect the realistic weight loss/gain rate (~0.5 kg/week for fat loss).
-If the client's target is too aggressive, gently explain realistic expectations.
-Motivate and support. Be concrete and practical.
+{tab_instruction}
 {lang_instruction}"""
+
+_TAB_INSTRUCTIONS = {
+    "chat": (
+        "CURRENT CONTEXT: General chat. "
+        "You are open and versatile — discuss any topic the client raises: training, nutrition, recovery, motivation, lifestyle, health. "
+        "Give advice, support, answer questions, motivate. Be warm and engaging."
+    ),
+    "diary": (
+        "CURRENT CONTEXT: Workout diary. "
+        "Focus exclusively on training. When the client sends a photo, identify which muscle groups are being worked and assess form/technique. "
+        "Recommend specific exercises for targeted muscle groups. "
+        "Analyze training volume and intensity. Track progress across sessions. "
+        "Do NOT discuss nutrition or unrelated topics unless directly asked."
+    ),
+    "food": (
+        "CURRENT CONTEXT: Nutrition log. "
+        "Focus exclusively on nutrition. Suggest recipes and meal options aligned with the client's goal. "
+        "Help calculate calories and macros (protein, fat, carbs). "
+        "When the client sends a food photo, identify what is shown and estimate calories and macros. "
+        "Help build a personalized diet plan based on preferences and daily calorie target. "
+        "Do NOT discuss training or unrelated topics unless directly asked."
+    ),
+    "analysis": (
+        "CURRENT CONTEXT: Progress analysis. "
+        "Analyze the client's training history and provide clear conclusions. "
+        "Highlight strengths, identify weak or neglected muscle groups, and spot concerning trends. "
+        "Give concrete, actionable correction suggestions. "
+        "Summarize progress toward the client's goal with realistic assessments. "
+        "Be direct and data-driven."
+    ),
+    "program": (
+        "CURRENT CONTEXT: Training program. "
+        "Focus exclusively on building and refining training programs. "
+        "Design structured weekly programs aligned with the client's goal, fitness level, and available days. "
+        "When asked to correct or adjust the program, make targeted, justified changes. "
+        "Recommend specific exercises with sets, reps, and weights appropriate for the client's level. "
+        "Explain why each exercise or change is recommended. "
+        "Do NOT discuss unrelated topics unless directly asked."
+    ),
+}
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", system_prompt),
@@ -423,10 +460,6 @@ def get_chain_input(user_input: str) -> dict:
         _prog_info = (f"Current training program «{_prog['title']}» "
                       f"(saved {_prog['updated_at'][:10]}):\n{_prog['raw_text'][:1500]}\n"
                       f"Take this program into account when giving advice and corrections.")
-        if _active_tab == "program":
-            _prog_info += ("\nIMPORTANT: The user is currently viewing the training program tab. "
-                           "They want to discuss or modify this specific program. "
-                           "Focus your response on the program structure, exercises, and scheduling.")
     else:
         _prog_info = ""
     return {
@@ -434,6 +467,7 @@ def get_chain_input(user_input: str) -> dict:
         "goal": goal, "level": level, "trainer_style": trainer_style,
         "weight_goal_info": _weight_goal_info,
         "active_program_info": _prog_info,
+        "tab_instruction": _TAB_INSTRUCTIONS.get(_active_tab, _TAB_INSTRUCTIONS["chat"]),
         "lang_instruction": t(lang, "system_prompt_lang"),
         "history": st.session_state.history.messages,
         "input": user_input,
@@ -455,10 +489,11 @@ def get_system_text():
                   f"Take this program into account when giving advice and corrections."
                   if _prog else "")
     return system_prompt.format(
-        name=name, age=age, weight=weight, height=height,
+        name=name, age=age, gender=gender, weight=weight, height=height,
         goal=goal, level=level, trainer_style=trainer_style,
         weight_goal_info=_weight_goal_info,
         active_program_info=_prog_info,
+        tab_instruction=_TAB_INSTRUCTIONS.get(_active_tab, _TAB_INSTRUCTIONS["chat"]),
         lang_instruction=t(lang, "system_prompt_lang")
     )
 
