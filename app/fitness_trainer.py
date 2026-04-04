@@ -1888,7 +1888,15 @@ if _active_tab == "workout":
                 ]
                 st.session_state.wk_last_source = _source
 
-        st.markdown("**Упражнения:**")
+        # Заголовки колонок
+        _h1, _h2, _h3, _h4, _h5, _h6 = st.columns([3, 1, 1, 1, 1, 0.5])
+        _h1.caption("Упражнение")
+        _h2.caption(t(lang, "workout_sets_label"))
+        _h3.caption(t(lang, "workout_reps_label"))
+        _h4.caption(t(lang, "workout_weight_label"))
+        _h5.caption(t(lang, "workout_rest_default"))
+        _h6.caption("")
+
         _to_remove = []
         for _ei, _ex in enumerate(st.session_state.wk_exercises):
             _c1, _c2, _c3, _c4, _c5, _c6 = st.columns([3, 1, 1, 1, 1, 0.5])
@@ -2052,19 +2060,44 @@ if _active_tab == "workout":
     # ── ФАЗА 3: Тренировка завершена ────────────────────────
     elif _wk.wk_finished:
         _elapsed = int(_time.time() - (_wk.wk_start_ts or _time.time()))
-        _h, _rem = divmod(_elapsed, 3600)
-        _m, _s = divmod(_rem, 60)
-        _time_str = f"{_h:02d}:{_m:02d}:{_s:02d}" if _h else f"{_m:02d}:{_s:02d}"
+        _h_t, _rem = divmod(_elapsed, 3600)
+        _m_t, _s_t = divmod(_rem, 60)
+        _time_str = f"{_h_t:02d}:{_m_t:02d}:{_s_t:02d}" if _h_t else f"{_m_t:02d}:{_s_t:02d}"
+        _duration_min = max(1, _elapsed // 60)
+
+        # Автосохранение в дневник (один раз)
+        if not st.session_state.get("wk_saved_to_diary"):
+            _workout_date = str(date.today())
+            _start_hour = int((_wk.wk_start_ts % 86400) // 3600) if _wk.wk_start_ts else 9
+            _start_str = f"{_start_hour:02d}:00"
+            _end_hour = _start_hour + max(1, _elapsed // 3600)
+            _end_str = f"{min(_end_hour, 23):02d}:{(_elapsed % 3600) // 60:02d}"
+            for _i, _ex in enumerate(_wk.wk_exercises):
+                _sets_done = sum(1 for _ss in range(_ex["sets"]) if (_i, _ss) in _wk.wk_done_sets)
+                if _sets_done > 0:
+                    add_exercise(
+                        user_name=name,
+                        workout_date=_workout_date,
+                        exercise=_ex["name"],
+                        muscle_group="",
+                        sets=_sets_done,
+                        reps=_ex["reps"],
+                        weight_kg=float(_ex["weight"]),
+                        rest_sec=int(_ex.get("rest", 60)),
+                        workout_start=_start_str,
+                        workout_end=_end_str,
+                        duration_min=_duration_min,
+                    )
+            st.session_state.wk_saved_to_diary = True
 
         st.success(t(lang, "workout_complete_msg"))
+        st.info(f"📓 Тренировка сохранена в дневник — {date.today()}")
         st.markdown(f"### ⏱ {_time_str}")
         st.caption(t(lang, "workout_stopwatch"))
 
         st.subheader(t(lang, "workout_summary"))
-        _done_count = 0
         for _i, _ex in enumerate(_wk.wk_exercises):
             _sets_done = sum(1 for _ss in range(_ex["sets"]) if (_i, _ss) in _wk.wk_done_sets)
-            _done_count += _sets_done
             _icon = "✅" if _sets_done == _ex["sets"] else "⚠️"
             st.markdown(f"{_icon} **{_ex['name']}** — {_sets_done}/{_ex['sets']} подходов"
                         + (f" @ {_ex['weight']:.1f}кг" if _ex['weight'] > 0 else ""))
@@ -2073,6 +2106,6 @@ if _active_tab == "workout":
         if st.button("🔄 Новая тренировка", use_container_width=True):
             for _k in ["wk_started", "wk_start_ts", "wk_ex_idx", "wk_set_idx",
                        "wk_resting", "wk_rest_end", "wk_done_sets", "wk_finished",
-                       "wk_exercises", "wk_last_source"]:
+                       "wk_exercises", "wk_last_source", "wk_saved_to_diary"]:
                 st.session_state.pop(_k, None)
             st.rerun()
