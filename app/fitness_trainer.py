@@ -1972,26 +1972,8 @@ if _active_tab == "workout":
         _total_sets = _cur_ex["sets"]
         _rest_secs = int(_cur_ex.get("rest", 60))
 
-        # Секундомер — JS обновляет прямо в браузере без ререндера
+        # Секундомер — вычисляем серверное время, JS только тикает от него
         _elapsed = int(_time.time() - _wk.wk_start_ts)
-        _h, _rem = divmod(_elapsed, 3600)
-        _m, _s = divmod(_rem, 60)
-        _stopwatch_str = f"{_h:02d}:{_m:02d}:{_s:02d}" if _h else f"{_m:02d}:{_s:02d}"
-        components.html(f"""<script>
-        (function() {{
-            var start = Date.now() - {_elapsed * 1000};
-            function pad(n) {{ return String(n).padStart(2,'0'); }}
-            function tick() {{
-                var e = Math.floor((Date.now() - start) / 1000);
-                var h = Math.floor(e/3600), m = Math.floor((e%3600)/60), s = e%60;
-                var str = h ? pad(h)+':'+pad(m)+':'+pad(s) : pad(m)+':'+pad(s);
-                var el = window.parent.document.getElementById('wk-stopwatch');
-                if (el) el.innerText = '⏱ ' + str;
-            }}
-            tick();
-            setInterval(tick, 1000);
-        }})();
-        </script>""", height=0)
 
         # Прогресс по упражнениям
         _total_ex = len(_exercises)
@@ -2005,8 +1987,21 @@ if _active_tab == "workout":
                        f"  ·  {_cur_ex['reps']} повт."
                        + (f"  ·  {_cur_ex['weight']:.1f} кг" if _cur_ex['weight'] > 0 else ""))
         with _hcol2:
-            st.markdown(f'<h3 id="wk-stopwatch">⏱ {_stopwatch_str}</h3>', unsafe_allow_html=True)
-            st.caption(t(lang, "workout_stopwatch"))
+            components.html(f"""
+            <div style="font-size:1.6rem;font-weight:700;color:#262730;font-family:sans-serif" id="sw"></div>
+            <div style="font-size:0.75rem;color:#888;margin-top:2px">{t(lang, "workout_stopwatch")}</div>
+            <script>
+            (function(){{
+                var start = Date.now() - {_elapsed * 1000};
+                function pad(n){{return String(n).padStart(2,'0');}}
+                function tick(){{
+                    var e=Math.floor((Date.now()-start)/1000);
+                    var h=Math.floor(e/3600),m=Math.floor((e%3600)/60),s=e%60;
+                    document.getElementById('sw').innerText = '⏱ '+(h?pad(h)+':':'')+pad(m)+':'+pad(s);
+                }}
+                tick(); setInterval(tick,1000);
+            }})();
+            </script>""", height=60)
 
         # Список подходов текущего упражнения
         st.markdown("---")
