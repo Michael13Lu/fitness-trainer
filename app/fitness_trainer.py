@@ -2036,7 +2036,8 @@ if _active_tab == "workout":
             else:
                 _rm, _rs = divmod(_remaining, 60)
                 st.info(f"💤 {t(lang, 'workout_rest_label')} **{_rm:02d}:{_rs:02d}**")
-                _rc1, _rc2 = st.columns(2)
+                st.markdown("<div style='display:flex;gap:2px'>", unsafe_allow_html=True)
+                _rc1, _rc2 = st.columns([6, 1])
                 with _rc1:
                     if st.button(t(lang, "workout_skip_rest"), use_container_width=True):
                         st.session_state.wk_resting = False
@@ -2044,6 +2045,7 @@ if _active_tab == "workout":
                         st.rerun()
                 with _rc2:
                     st.button("🔄", help="Обновить таймер", use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
 
         else:
             # Кнопка выполнения подхода
