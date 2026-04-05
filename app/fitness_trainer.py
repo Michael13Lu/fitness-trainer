@@ -521,9 +521,19 @@ with st.sidebar:
             # ── Мои плейлисты (если залогинен) ──────────────
             _sp_user_tok = _spotify_user_token()
             if _sp_user_tok:
-                _my_lists = _spotify_my_playlists(_sp_user_tok)
-                _my_dict = {f"👤 {n}": ("playlist", pid) for pid, n, _ in _my_lists}
-                st.caption("✅ Spotify подключён")
+                import requests as _req2
+                _pl_r = _req2.get(
+                    "https://api.spotify.com/v1/me/playlists",
+                    headers={"Authorization": f"Bearer {_sp_user_tok}"},
+                    params={"limit": 50}, timeout=10,
+                )
+                if _pl_r.ok:
+                    _my_items = _pl_r.json().get("items", [])
+                    _my_dict = {f"👤 {p['name']}": ("playlist", p["id"]) for p in _my_items if p}
+                    st.caption(f"✅ Spotify подключён · {len(_my_dict)} плейлистов")
+                else:
+                    _my_dict = {}
+                    st.caption(f"⚠️ Spotify API {_pl_r.status_code}: {_pl_r.text[:100]}")
                 if st.button("🚪 Выйти", key="sp_logout", use_container_width=True):
                     st.session_state.pop("sp_user_token", None)
                     st.session_state.pop("sp_refresh_token", None)
