@@ -412,30 +412,12 @@ with st.sidebar:
                         height=152
                     )
                 else:
-                    # Поиск через API — получаем токен снаружи кеша
-                    _sp_tok = _spotify_token()
-                    if not _sp_tok:
-                        st.caption("Для поиска треков добавь SPOTIFY_CLIENT_ID и SPOTIFY_CLIENT_SECRET в .env")
-                        _q = _sp_custom.replace(" ", "%20")
-                        st.link_button("🔍 Открыть поиск в Spotify",
-                                       f"https://open.spotify.com/search/{_q}", use_container_width=True)
-                    else:
-                        try:
-                            _sp_results = _spotify_search(_sp_custom, _sp_tok)
-                        except Exception as _e:
-                            st.error(str(_e))
-                            _sp_results = []
-                        if _sp_results:
-                            _sp_labels = [label for _, label in _sp_results]
-                            _sp_sel = st.selectbox("Треки", _sp_labels,
-                                                   label_visibility="collapsed", key="sp_result_sel")
-                            _sp_track_id = _sp_results[_sp_labels.index(_sp_sel)][0]
-                            components.iframe(
-                                f"https://open.spotify.com/embed/track/{_sp_track_id}?utm_source=generator&theme=0",
-                                height=152
-                            )
-                        elif not _sp_results:
-                            st.caption("Ничего не найдено")
+                    # Поиск — открываем в Spotify (API требует Premium)
+                    _q = _sp_custom.replace(" ", "%20")
+                    st.link_button("🔍 Найти в Spotify: " + _sp_custom,
+                                   f"https://open.spotify.com/search/{_q}",
+                                   use_container_width=True)
+                    st.caption("Вставь ссылку на трек/плейлист чтобы встроить плеер.")
             else:
                 components.iframe(
                     f"https://open.spotify.com/embed/playlist/{_sp_id}?utm_source=generator&theme=0",
