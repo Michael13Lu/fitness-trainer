@@ -1899,6 +1899,7 @@ if _active_tab == "workout":
 
         _to_remove = []
         for _ei, _ex in enumerate(st.session_state.wk_exercises):
+            st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
             _c1, _c2, _c3, _c4, _c5, _c6 = st.columns([3, 1, 1, 1, 1, 0.5])
             with _c1:
                 st.session_state.wk_exercises[_ei]["name"] = st.text_input(
