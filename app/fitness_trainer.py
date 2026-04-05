@@ -1891,7 +1891,7 @@ if _active_tab == "workout":
         # Заголовки колонок — CSS убирает gap между caption и первой строкой
         st.markdown("""<style>
         .wk-header { margin-bottom: -18px !important; }
-        .wk-row { margin-top: 0 !important; margin-bottom: -14px !important; }
+        .wk-row { margin-top: 0 !important; margin-bottom: -22px !important; }
         </style>""", unsafe_allow_html=True)
         st.markdown('<div class="wk-header">', unsafe_allow_html=True)
         _h1, _h2, _h3, _h4, _h5, _h6 = st.columns([3, 1, 1, 1, 1, 0.5])
