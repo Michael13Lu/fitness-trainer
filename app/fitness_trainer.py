@@ -105,30 +105,38 @@ if "sidebar_video_id" not in st.session_state:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _yt_search(query: str) -> list[tuple[str, str]]:
-    """Return list of (video_id, title) for YouTube search query."""
+    """Return list of (video_id, title) via YouTube suggest API (no key needed)."""
     try:
-        import innertube
-        c = innertube.InnerTube("WEB")
-        r = c.search(query)
-
-        def _walk(obj, out, depth=0):
-            if depth > 20 or len(out) >= 6:
-                return
-            if isinstance(obj, dict):
-                if "videoId" in obj and "title" in obj:
-                    title = obj["title"]
-                    if isinstance(title, dict):
-                        runs = title.get("runs", [])
-                        title = runs[0].get("text", "") if runs else title.get("simpleText", "")
-                    out.append((obj["videoId"], str(title)))
-                for v in obj.values():
-                    _walk(v, out, depth + 1)
-            elif isinstance(obj, list):
-                for item in obj:
-                    _walk(item, out, depth + 1)
-
-        results: list[tuple[str, str]] = []
-        _walk(r, results)
+        import requests as _req, json as _json, urllib.parse as _up
+        # YouTube autocomplete suggest — returns titles + videoIds via search page scrape
+        params = {"search_query": query, "sp": "EgIQAQ%3D%3D"}  # EgIQAQ = Videos filter
+        headers = {"User-Agent": "Mozilla/5.0", "Accept-Language": "en"}
+        r = _req.get("https://www.youtube.com/results", params=params,
+                     headers=headers, timeout=8)
+        # Extract video IDs and titles from the initial data JSON embedded in the page
+        import re as _re
+        m = _re.search(r'var ytInitialData = ({.+?});</script>', r.text)
+        if not m:
+            return []
+        data = _json.loads(m.group(1))
+        contents = (data.get("contents", {})
+                    .get("twoColumnSearchResultsRenderer", {})
+                    .get("primaryContents", {})
+                    .get("sectionListRenderer", {})
+                    .get("contents", []))
+        results = []
+        for section in contents:
+            items = (section.get("itemSectionRenderer", {})
+                     .get("contents", []))
+            for item in items:
+                vr = item.get("videoRenderer", {})
+                vid = vr.get("videoId")
+                title = (vr.get("title", {}).get("runs", [{}])[0].get("text", "")
+                         or vr.get("title", {}).get("simpleText", ""))
+                if vid and title:
+                    results.append((vid, title))
+                if len(results) >= 6:
+                    return results
         return results
     except Exception:
         return []
