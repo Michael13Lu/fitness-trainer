@@ -1870,17 +1870,11 @@ if _active_tab == "workout":
                         _label = f"Неделя {_wk_num} · {_wday_labels[_di] if _di < len(_wday_labels) else _di}"
                         _day_options[_label] = _day["exercises"]
 
-        _col_sel, _col_rest = st.columns([2, 1])
-        with _col_sel:
-            st.caption(t(lang, "workout_select_day"))
-            _source_options = [t(lang, "workout_custom")] + list(_day_options.keys())
-            _source = st.selectbox(t(lang, "workout_select_day"), _source_options,
-                                   key="wk_source", label_visibility="collapsed")
-        with _col_rest:
-            st.caption(t(lang, "workout_rest_timer"))
-            _rest_default = st.number_input(t(lang, "workout_rest_timer"), min_value=10, max_value=300,
-                                             value=60, step=5, key="wk_rest_default_input",
-                                             label_visibility="collapsed")
+        st.caption(t(lang, "workout_select_day"))
+        _source_options = [t(lang, "workout_custom")] + list(_day_options.keys())
+        _source = st.selectbox(t(lang, "workout_select_day"), _source_options,
+                               key="wk_source", label_visibility="collapsed")
+        _rest_default = 60
 
         # Список упражнений для редактирования
         if _source != t(lang, "workout_custom") and _source in _day_options:
