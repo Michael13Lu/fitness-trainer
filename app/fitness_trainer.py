@@ -2059,6 +2059,7 @@ if _active_tab == "workout":
                     _new_reps = st.number_input("Повторения", value=_cur_ex["reps"], min_value=1, max_value=200, key="wk_edit_reps")
                 with _ec4:
                     _new_weight = st.number_input("Вес (кг)", value=float(_cur_ex["weight"]), min_value=0.0, step=0.5, key="wk_edit_weight")
+                st.markdown("<div style='display:flex;gap:1px'>", unsafe_allow_html=True)
                 _ecb1, _ecb2 = st.columns(2)
                 with _ecb1:
                     if st.button("💾 Применить", use_container_width=True, key="wk_edit_apply"):
@@ -2075,9 +2076,12 @@ if _active_tab == "workout":
                         st.session_state.wk_set_idx = 0
                         st.session_state.wk_resting = False
                         st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+                st.markdown("<div style='margin-top:1px'>", unsafe_allow_html=True)
                 if st.button("➕ Добавить упражнение после текущего", use_container_width=True, key="wk_edit_add"):
                     st.session_state.wk_exercises.insert(_ei + 1, {"name": "", "sets": 3, "reps": 10, "weight": 0.0, "rest": 60})
                     st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
             # Кнопка выполнения подхода
             _btn_label = (t(lang, "workout_next_ex")
