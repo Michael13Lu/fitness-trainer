@@ -160,21 +160,17 @@ def _spotify_token() -> str | None:
     return r.json().get("access_token")
 
 
-@st.cache_data(ttl=600, show_spinner=False)
 def _spotify_search(query: str, token: str) -> list[tuple[str, str]]:
     """Return list of (track_id, label) via Spotify API."""
-    try:
-        import requests as _req
-        r = _req.get(
-            "https://api.spotify.com/v1/search",
-            headers={"Authorization": f"Bearer {token}"},
-            params={"q": query, "type": "track", "limit": 6},
-            timeout=5,
-        )
-        items = r.json().get("tracks", {}).get("items", [])
-        return [(t["id"], f"{t['name']} — {t['artists'][0]['name']}") for t in items if t]
-    except Exception:
-        return []
+    import requests as _req
+    r = _req.get(
+        "https://api.spotify.com/v1/search",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"q": query, "type": "track", "limit": 6},
+        timeout=10,
+    )
+    items = r.json().get("tracks", {}).get("items", [])
+    return [(t["id"], f"{t['name']} — {t['artists'][0]['name']}") for t in items if t]
 
 
 with st.sidebar:
