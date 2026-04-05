@@ -242,12 +242,26 @@ with st.sidebar:
                 "🎧 Hip-Hop Beats (24/7)": ("HuFYqnbVbzY", "https://www.youtube.com/watch?v=HuFYqnbVbzY"),
             }
             _genre = st.selectbox("Stream", list(_yt_streams.keys()), label_visibility="collapsed")
-            _vid_id, _yt_link = _yt_streams[_genre]
-            components.iframe(
-                f"https://www.youtube.com/embed/{_vid_id}?autoplay=0",
-                height=140
+            _yt_custom = st.text_input(
+                "search", placeholder="Вставь ссылку YouTube или название...",
+                label_visibility="collapsed",
+                key="yt_custom_input"
             )
-            st.link_button("▶ Открыть на YouTube", _yt_link, use_container_width=True)
+            import re as _re
+            if _yt_custom:
+                _yt_match = _re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})', _yt_custom)
+                if _yt_match:
+                    _yt_vid = _yt_match.group(1)
+                    components.iframe(f"https://www.youtube.com/embed/{_yt_vid}?autoplay=0", height=140)
+                    st.link_button("▶ Открыть на YouTube", f"https://www.youtube.com/watch?v={_yt_vid}", use_container_width=True)
+                else:
+                    _q = _yt_custom.replace(" ", "+")
+                    st.link_button("🔍 Найти на YouTube: " + _yt_custom,
+                                   f"https://www.youtube.com/results?search_query={_q}", use_container_width=True)
+            else:
+                _vid_id, _yt_link = _yt_streams[_genre]
+                components.iframe(f"https://www.youtube.com/embed/{_vid_id}?autoplay=0", height=140)
+                st.link_button("▶ Открыть на YouTube", _yt_link, use_container_width=True)
 
         elif _music_service == "SoundCloud":
             _sc_tracks = {
@@ -297,9 +311,28 @@ with st.sidebar:
                 "🧘 Chill Hits": "37i9dQZF1DX4WYpdgoIcn6",
             }
             _sp_pl = st.selectbox("Playlist", list(_sp_playlists.keys()), label_visibility="collapsed")
+            _sp_custom = st.text_input(
+                "search", placeholder="Вставь ссылку Spotify или название...",
+                label_visibility="collapsed",
+                key="sp_custom_input"
+            )
+            # Определяем что показывать: кастомный ввод или пресет
+            import re as _re
             _sp_id = _sp_playlists[_sp_pl]
-            _sp_embed = f"https://open.spotify.com/embed/playlist/{_sp_id}?utm_source=generator&theme=0"
-            components.iframe(_sp_embed, height=152)
+            _sp_type = "playlist"
+            if _sp_custom:
+                _sp_match = _re.search(r'spotify\.com/(playlist|album|track)/([A-Za-z0-9]+)', _sp_custom)
+                if _sp_match:
+                    _sp_type, _sp_id = _sp_match.group(1), _sp_match.group(2)
+                else:
+                    # Поиск по тексту — открываем Spotify search
+                    _q = _sp_custom.replace(" ", "%20")
+                    st.link_button("🔍 Найти на Spotify: " + _sp_custom,
+                                   f"https://open.spotify.com/search/{_q}", use_container_width=True)
+                    _sp_id = None
+            if _sp_id:
+                _sp_embed = f"https://open.spotify.com/embed/{_sp_type}/{_sp_id}?utm_source=generator&theme=0"
+                components.iframe(_sp_embed, height=152)
 
 # Читаем профиль из session_state (всегда доступны)
 name = _prof["name"]
