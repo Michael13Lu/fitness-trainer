@@ -134,6 +134,42 @@ def _yt_search(query: str) -> list[tuple[str, str]]:
         return []
 
 
+def _spotify_token() -> str | None:
+    cid = os.getenv("SPOTIFY_CLIENT_ID")
+    csec = os.getenv("SPOTIFY_CLIENT_SECRET")
+    if not cid or not csec:
+        return None
+    import requests as _req, base64 as _b64
+    auth = _b64.b64encode(f"{cid}:{csec}".encode()).decode()
+    r = _req.post(
+        "https://accounts.spotify.com/api/token",
+        headers={"Authorization": f"Basic {auth}"},
+        data={"grant_type": "client_credentials"},
+        timeout=5,
+    )
+    return r.json().get("access_token")
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _spotify_search(query: str) -> list[tuple[str, str, str]]:
+    """Return list of (track_id, label) via Spotify API."""
+    try:
+        import requests as _req
+        token = _spotify_token()
+        if not token:
+            return []
+        r = _req.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={"q": query, "type": "track", "limit": 6},
+            timeout=5,
+        )
+        items = r.json().get("tracks", {}).get("items", [])
+        return [(t["id"], f"{t['name']} — {t['artists'][0]['name']}") for t in items if t]
+    except Exception:
+        return []
+
+
 with st.sidebar:
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -346,27 +382,45 @@ with st.sidebar:
             }
             _sp_pl = st.selectbox("Playlist", list(_sp_playlists.keys()), label_visibility="collapsed")
             _sp_custom = st.text_input(
-                "search", placeholder="Вставь ссылку Spotify или название...",
+                "search", placeholder="🔍 Найти трек или вставь ссылку Spotify...",
                 label_visibility="collapsed",
                 key="sp_custom_input"
             )
-            # Определяем что показывать: кастомный ввод или пресет
-            import re as _re
             _sp_id = _sp_playlists[_sp_pl]
             _sp_type = "playlist"
             if _sp_custom:
-                _sp_match = _re.search(r'spotify\.com/(playlist|album|track)/([A-Za-z0-9]+)', _sp_custom)
-                if _sp_match:
-                    _sp_type, _sp_id = _sp_match.group(1), _sp_match.group(2)
+                _sp_url_match = re.search(r'spotify\.com/(playlist|album|track)/([A-Za-z0-9]+)', _sp_custom)
+                if _sp_url_match:
+                    # Прямая ссылка → встраиваем
+                    _sp_type, _sp_id = _sp_url_match.group(1), _sp_url_match.group(2)
+                    components.iframe(
+                        f"https://open.spotify.com/embed/{_sp_type}/{_sp_id}?utm_source=generator&theme=0",
+                        height=152
+                    )
                 else:
-                    # Поиск по тексту — открываем Spotify search
-                    _q = _sp_custom.replace(" ", "%20")
-                    st.link_button("🔍 Найти на Spotify: " + _sp_custom,
-                                   f"https://open.spotify.com/search/{_q}", use_container_width=True)
-                    _sp_id = None
-            if _sp_id:
-                _sp_embed = f"https://open.spotify.com/embed/{_sp_type}/{_sp_id}?utm_source=generator&theme=0"
-                components.iframe(_sp_embed, height=152)
+                    # Поиск через API
+                    _sp_results = _spotify_search(_sp_custom)
+                    if _sp_results:
+                        _sp_labels = [label for _, label in _sp_results]
+                        _sp_sel = st.selectbox("Треки", _sp_labels,
+                                               label_visibility="collapsed", key="sp_result_sel")
+                        _sp_track_id = _sp_results[_sp_labels.index(_sp_sel)][0]
+                        components.iframe(
+                            f"https://open.spotify.com/embed/track/{_sp_track_id}?utm_source=generator&theme=0",
+                            height=152
+                        )
+                    elif _spotify_token() is None:
+                        st.caption("Для поиска треков добавь SPOTIFY_CLIENT_ID и SPOTIFY_CLIENT_SECRET в .env")
+                        _q = _sp_custom.replace(" ", "%20")
+                        st.link_button("🔍 Открыть поиск в Spotify",
+                                       f"https://open.spotify.com/search/{_q}", use_container_width=True)
+                    else:
+                        st.caption("Ничего не найдено")
+            else:
+                components.iframe(
+                    f"https://open.spotify.com/embed/playlist/{_sp_id}?utm_source=generator&theme=0",
+                    height=152
+                )
 
 # Читаем профиль из session_state (всегда доступны)
 name = _prof["name"]
