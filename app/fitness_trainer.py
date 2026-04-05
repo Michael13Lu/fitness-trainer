@@ -1891,7 +1891,12 @@ if _active_tab == "workout":
         # Заголовки колонок — CSS убирает gap между caption и первой строкой
         st.markdown("""<style>
         .wk-header { margin-bottom: -18px !important; }
-        .wk-row { margin-top: 0 !important; margin-bottom: -22px !important; }
+        /* Убираем зарезервированное место под скрытые label-элементы */
+        div[data-testid="stNumberInput"] > label,
+        div[data-testid="stTextInput"] > label { display: none !important; }
+        div[data-testid="stNumberInput"],
+        div[data-testid="stTextInput"] { margin-bottom: 0 !important; padding-bottom: 0 !important; }
+        div[data-testid="stHorizontalBlock"] { margin-bottom: -8px !important; gap: 4px !important; }
         </style>""", unsafe_allow_html=True)
         st.markdown('<div class="wk-header">', unsafe_allow_html=True)
         _h1, _h2, _h3, _h4, _h5, _h6 = st.columns([3, 1, 1, 1, 1, 0.5])
@@ -1905,7 +1910,6 @@ if _active_tab == "workout":
 
         _to_remove = []
         for _ei, _ex in enumerate(st.session_state.wk_exercises):
-            st.markdown('<div class="wk-row">', unsafe_allow_html=True)
             _c1, _c2, _c3, _c4, _c5, _c6 = st.columns([3, 1, 1, 1, 1, 0.5])
             with _c1:
                 st.session_state.wk_exercises[_ei]["name"] = st.text_input(
@@ -1930,7 +1934,6 @@ if _active_tab == "workout":
             with _c6:
                 if st.button("🗑️", key=f"wex_del_{_ei}"):
                     _to_remove.append(_ei)
-            st.markdown('</div>', unsafe_allow_html=True)
 
         for _ri in reversed(_to_remove):
             st.session_state.wk_exercises.pop(_ri)
