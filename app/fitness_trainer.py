@@ -134,10 +134,20 @@ def _yt_search(query: str) -> list[tuple[str, str]]:
         return []
 
 
+def _get_spotify_creds() -> tuple[str, str] | tuple[None, None]:
+    """Get Spotify credentials from st.secrets or env vars."""
+    try:
+        cid = st.secrets.get("SPOTIFY_CLIENT_ID") or os.getenv("SPOTIFY_CLIENT_ID")
+        csec = st.secrets.get("SPOTIFY_CLIENT_SECRET") or os.getenv("SPOTIFY_CLIENT_SECRET")
+    except Exception:
+        cid = os.getenv("SPOTIFY_CLIENT_ID")
+        csec = os.getenv("SPOTIFY_CLIENT_SECRET")
+    return (cid, csec) if cid and csec else (None, None)
+
+
 def _spotify_token() -> str | None:
-    cid = os.getenv("SPOTIFY_CLIENT_ID")
-    csec = os.getenv("SPOTIFY_CLIENT_SECRET")
-    if not cid or not csec:
+    cid, csec = _get_spotify_creds()
+    if not cid:
         return None
     import requests as _req, base64 as _b64
     auth = _b64.b64encode(f"{cid}:{csec}".encode()).decode()
@@ -150,14 +160,11 @@ def _spotify_token() -> str | None:
     return r.json().get("access_token")
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _spotify_search(query: str) -> list[tuple[str, str, str]]:
+@st.cache_data(ttl=600, show_spinner=False)
+def _spotify_search(query: str, token: str) -> list[tuple[str, str]]:
     """Return list of (track_id, label) via Spotify API."""
     try:
         import requests as _req
-        token = _spotify_token()
-        if not token:
-            return []
         r = _req.get(
             "https://api.spotify.com/v1/search",
             headers={"Authorization": f"Bearer {token}"},
@@ -398,24 +405,26 @@ with st.sidebar:
                         height=152
                     )
                 else:
-                    # Поиск через API
-                    _sp_results = _spotify_search(_sp_custom)
-                    if _sp_results:
-                        _sp_labels = [label for _, label in _sp_results]
-                        _sp_sel = st.selectbox("Треки", _sp_labels,
-                                               label_visibility="collapsed", key="sp_result_sel")
-                        _sp_track_id = _sp_results[_sp_labels.index(_sp_sel)][0]
-                        components.iframe(
-                            f"https://open.spotify.com/embed/track/{_sp_track_id}?utm_source=generator&theme=0",
-                            height=152
-                        )
-                    elif _spotify_token() is None:
+                    # Поиск через API — получаем токен снаружи кеша
+                    _sp_tok = _spotify_token()
+                    if _sp_tok is None:
                         st.caption("Для поиска треков добавь SPOTIFY_CLIENT_ID и SPOTIFY_CLIENT_SECRET в .env")
                         _q = _sp_custom.replace(" ", "%20")
                         st.link_button("🔍 Открыть поиск в Spotify",
                                        f"https://open.spotify.com/search/{_q}", use_container_width=True)
                     else:
-                        st.caption("Ничего не найдено")
+                        _sp_results = _spotify_search(_sp_custom, _sp_tok)
+                        if _sp_results:
+                            _sp_labels = [label for _, label in _sp_results]
+                            _sp_sel = st.selectbox("Треки", _sp_labels,
+                                                   label_visibility="collapsed", key="sp_result_sel")
+                            _sp_track_id = _sp_results[_sp_labels.index(_sp_sel)][0]
+                            components.iframe(
+                                f"https://open.spotify.com/embed/track/{_sp_track_id}?utm_source=generator&theme=0",
+                                height=152
+                            )
+                        else:
+                            st.caption("Ничего не найдено")
             else:
                 components.iframe(
                     f"https://open.spotify.com/embed/playlist/{_sp_id}?utm_source=generator&theme=0",
