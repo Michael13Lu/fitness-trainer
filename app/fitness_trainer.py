@@ -103,7 +103,7 @@ if "sidebar_video_id" not in st.session_state:
     st.session_state.sidebar_video_id = None
 
 with st.sidebar:
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("👤", use_container_width=True):
             st.session_state.sidebar_section = "profile"
@@ -111,12 +111,16 @@ with st.sidebar:
         if st.button("🔊", use_container_width=True):
             st.session_state.sidebar_section = "voice"
     with c3:
-        cal_label = "📅 ✓" if st.session_state.gcal_creds else "📅"
+        cal_label = "📅✓" if st.session_state.gcal_creds else "📅"
         if st.button(cal_label, use_container_width=True):
             st.session_state.sidebar_section = "calendar"
+    c4, c5 = st.columns(2)
     with c4:
         if st.button("🎬", use_container_width=True):
             st.session_state.sidebar_section = "video"
+    with c5:
+        if st.button("🎵", use_container_width=True):
+            st.session_state.sidebar_section = "music"
 
     st.divider()
 
@@ -217,6 +221,84 @@ with st.sidebar:
             st.link_button("▶ " + t(lang, "video_tutorials") + " на YouTube", _search_url, use_container_width=True)
         else:
             st.caption("Нажми ▶ на упражнении в программе — здесь появится видео.")
+
+    # ── Музыкальный плеер ────────────────────────────────────
+    elif st.session_state.sidebar_section == "music":
+        st.markdown(f"**🎵 {t(lang, 'music_player')}**")
+        _music_service = st.selectbox(
+            t(lang, "music_service"),
+            ["YouTube Music", "SoundCloud", "Radio.garden", "DI.FM", "Spotify"],
+            index=st.session_state.get("music_service_idx", 0),
+            label_visibility="collapsed"
+        )
+        st.session_state.music_service_idx = ["YouTube Music", "SoundCloud", "Radio.garden", "DI.FM", "Spotify"].index(_music_service)
+
+        if _music_service == "YouTube Music":
+            _yt_genres = {
+                "🏋️ Workout": "https://www.youtube.com/embed/videoseries?list=PLFPg_IUxqnZNnACUGsfn50DkRz5G5POSITN",
+                "⚡ High Energy": "https://www.youtube.com/embed/videoseries?list=PLw-VjHDlEOgs_nCxlK52tKpEwLmG-TRcd",
+                "🎧 EDM / Electronic": "https://www.youtube.com/embed/videoseries?list=PLhInz4M-OzRoE8_vHq3yHEbhDLp93Ob4d",
+                "🥊 Hip-Hop / Rap": "https://www.youtube.com/embed/videoseries?list=PLDIoUOhQQPlXr63I_vwF06FF23k2HoIJz",
+                "🎸 Rock": "https://www.youtube.com/embed/videoseries?list=PLgzTt0k8mXzEk586ze4BjvDXR7c-TUSnx",
+                "🧘 Chill / Lofi": "https://www.youtube.com/embed/videoseries?list=PLofht4PTcKYnaH8w5olJCFoL6tFpiqgrF",
+            }
+            _genre = st.selectbox("Genre", list(_yt_genres.keys()), label_visibility="collapsed")
+            _embed_url = _yt_genres[_genre]
+            components.iframe(_embed_url, height=120)
+            st.caption("▶ Open YouTube for full player")
+
+        elif _music_service == "SoundCloud":
+            _sc_playlists = {
+                "🏋️ Workout Beats": "https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/soundcloud-shine/sets/workout&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false",
+                "⚡ Electronic": "https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/soundcloud-shine/sets/electronic&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false",
+                "🎧 Hip-Hop": "https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/soundcloud-shine/sets/hiphop&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false",
+            }
+            _sc_genre = st.selectbox("Playlist", list(_sc_playlists.keys()), label_visibility="collapsed")
+            components.iframe(_sc_playlists[_sc_genre], height=166, scrolling=False)
+
+        elif _music_service == "Radio.garden":
+            _rg_stations = {
+                "🌍 Browse World Radio": "https://radio.garden/listen",
+                "🏋️ Energy FM (UK)": "https://radio.garden/listen/energy-fm/",
+                "🎧 Slam! FM (NL)": "https://radio.garden/listen/slam/",
+                "⚡ Kiss FM (UK)": "https://radio.garden/listen/kiss-fm-uk/",
+                "🎸 Planet Rock (UK)": "https://radio.garden/listen/planet-rock/",
+            }
+            _rg_station = st.selectbox("Station", list(_rg_stations.keys()), label_visibility="collapsed")
+            st.link_button("📻 Open " + _rg_station.split(" ")[1] + " in Radio.garden", _rg_stations[_rg_station], use_container_width=True)
+            st.caption("Radio.garden requires opening in browser (no embed allowed).")
+
+        elif _music_service == "DI.FM":
+            _di_channels = {
+                "🏋️ Workout": "progressive",
+                "⚡ Trance": "trance",
+                "🎧 Techno": "techno",
+                "🎶 House": "house",
+                "🌊 Ambient": "ambient",
+                "🥁 Drum & Bass": "drumandbass",
+                "🎸 Electro": "electro",
+                "💥 Hardcore": "hardcore",
+            }
+            _di_ch = st.selectbox("Channel", list(_di_channels.keys()), label_visibility="collapsed")
+            _di_key = _di_channels[_di_ch]
+            _di_url = f"https://www.di.fm/player/{_di_key}"
+            _di_stream = f"https://prem4.di.fm/{_di_key}"
+            st.audio(_di_stream, format="audio/mpeg")
+            st.link_button("🎧 Open DI.FM: " + _di_ch, _di_url, use_container_width=True)
+
+        elif _music_service == "Spotify":
+            _sp_playlists = {
+                "🏋️ Workout": "37i9dQZF1DX76Wlfdnj7AP",
+                "⚡ Power Workout": "37i9dQZF1DXdxkSvqMcMKd",
+                "🎧 Electronic": "37i9dQZF1DX4dyzvuaRJ0n",
+                "🥊 Hip-Hop": "37i9dQZF1DX0XUsuxWHRQd",
+                "🎸 Rock Workout": "37i9dQZF1DX35oM5IDVEhA",
+                "🧘 Chill Hits": "37i9dQZF1DX4WYpdgoIcn6",
+            }
+            _sp_pl = st.selectbox("Playlist", list(_sp_playlists.keys()), label_visibility="collapsed")
+            _sp_id = _sp_playlists[_sp_pl]
+            _sp_embed = f"https://open.spotify.com/embed/playlist/{_sp_id}?utm_source=generator&theme=0"
+            components.iframe(_sp_embed, height=152)
 
 # Читаем профиль из session_state (всегда доступны)
 name = _prof["name"]
