@@ -2067,6 +2067,7 @@ if _active_tab == "workout":
         # Обновляем секундомер каждую секунду (сохраняет session_state)
         _time.sleep(1)
         st.rerun()
+        st.stop()
 
     # ── ФАЗА 3: Тренировка завершена ────────────────────────
     elif _wk.wk_finished:
