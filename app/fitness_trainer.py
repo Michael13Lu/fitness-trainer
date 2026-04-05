@@ -2048,6 +2048,37 @@ if _active_tab == "workout":
                 st.markdown("</div>", unsafe_allow_html=True)
 
         else:
+            # Быстрое редактирование текущего упражнения
+            with st.expander("✏️ Изменить упражнение", expanded=False):
+                _ec1, _ec2, _ec3, _ec4 = st.columns([3, 1, 1, 1])
+                with _ec1:
+                    _new_name = st.text_input("Название", value=_cur_ex["name"], key="wk_edit_name")
+                with _ec2:
+                    _new_sets = st.number_input("Подходы", value=_cur_ex["sets"], min_value=1, max_value=20, key="wk_edit_sets")
+                with _ec3:
+                    _new_reps = st.number_input("Повторения", value=_cur_ex["reps"], min_value=1, max_value=200, key="wk_edit_reps")
+                with _ec4:
+                    _new_weight = st.number_input("Вес (кг)", value=float(_cur_ex["weight"]), min_value=0.0, step=0.5, key="wk_edit_weight")
+                _ecb1, _ecb2 = st.columns(2)
+                with _ecb1:
+                    if st.button("💾 Применить", use_container_width=True, key="wk_edit_apply"):
+                        st.session_state.wk_exercises[_ei]["name"] = _new_name
+                        st.session_state.wk_exercises[_ei]["sets"] = _new_sets
+                        st.session_state.wk_exercises[_ei]["reps"] = _new_reps
+                        st.session_state.wk_exercises[_ei]["weight"] = _new_weight
+                        st.rerun()
+                with _ecb2:
+                    if st.button("🗑️ Пропустить упражнение", use_container_width=True, key="wk_edit_skip"):
+                        st.session_state.wk_exercises.pop(_ei)
+                        if _ei >= len(st.session_state.wk_exercises):
+                            st.session_state.wk_finished = True
+                        st.session_state.wk_set_idx = 0
+                        st.session_state.wk_resting = False
+                        st.rerun()
+                if st.button("➕ Добавить упражнение после текущего", use_container_width=True, key="wk_edit_add"):
+                    st.session_state.wk_exercises.insert(_ei + 1, {"name": "", "sets": 3, "reps": 10, "weight": 0.0, "rest": 60})
+                    st.rerun()
+
             # Кнопка выполнения подхода
             _btn_label = (t(lang, "workout_next_ex")
                           if _si + 1 >= _total_sets
