@@ -2131,6 +2131,13 @@ if _active_tab == "workout":
                           if _si + 1 >= _total_sets
                           else t(lang, "workout_next_set"))
 
+            st.markdown("""<style>
+            div[data-testid="stButton"] button[kind="primary"] {
+                height: 3.5rem !important;
+                font-size: 1.25rem !important;
+                font-weight: 700 !important;
+            }
+            </style>""", unsafe_allow_html=True)
             if st.button(f"✅ {t(lang, 'workout_done')} — {_btn_label}",
                          use_container_width=True, type="primary"):
                 st.session_state.wk_done_sets.add((_ei, _si))
