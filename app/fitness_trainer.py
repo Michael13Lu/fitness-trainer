@@ -1888,8 +1888,14 @@ if _active_tab == "workout":
                 ]
                 st.session_state.wk_last_source = _source
 
-        # Заголовки колонок
-        st.markdown("<div style='margin-bottom:-12px'>", unsafe_allow_html=True)
+        # Заголовки колонок — CSS убирает gap между caption и первой строкой
+        st.markdown("""<style>
+        .wk-header + div[data-testid="stHorizontalBlock"] { margin-top: 2px !important; }
+        .wk-header { margin-bottom: -18px !important; }
+        .wk-row { margin-top: 2px !important; margin-bottom: 0 !important; }
+        .wk-row div[data-testid="stHorizontalBlock"] { gap: 4px !important; }
+        </style>""", unsafe_allow_html=True)
+        st.markdown('<div class="wk-header">', unsafe_allow_html=True)
         _h1, _h2, _h3, _h4, _h5, _h6 = st.columns([3, 1, 1, 1, 1, 0.5])
         _h1.caption("Упражнение")
         _h2.caption(t(lang, "workout_sets_label"))
@@ -1897,11 +1903,11 @@ if _active_tab == "workout":
         _h4.caption(t(lang, "workout_weight_label"))
         _h5.caption(t(lang, "workout_rest_default"))
         _h6.caption("")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
         _to_remove = []
         for _ei, _ex in enumerate(st.session_state.wk_exercises):
-            st.markdown("<div style='margin-top:2px'></div>", unsafe_allow_html=True)
+            st.markdown('<div class="wk-row">', unsafe_allow_html=True)
             _c1, _c2, _c3, _c4, _c5, _c6 = st.columns([3, 1, 1, 1, 1, 0.5])
             with _c1:
                 st.session_state.wk_exercises[_ei]["name"] = st.text_input(
@@ -1926,6 +1932,7 @@ if _active_tab == "workout":
             with _c6:
                 if st.button("🗑️", key=f"wex_del_{_ei}"):
                     _to_remove.append(_ei)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         for _ri in reversed(_to_remove):
             st.session_state.wk_exercises.pop(_ri)
