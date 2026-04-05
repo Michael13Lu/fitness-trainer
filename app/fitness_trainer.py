@@ -1978,9 +1978,6 @@ if _active_tab == "workout":
         _m, _s = divmod(_rem, 60)
         _stopwatch_str = f"{_h:02d}:{_m:02d}:{_s:02d}" if _h else f"{_m:02d}:{_s:02d}"
 
-        # Авто-обновление каждую секунду для секундомера
-        st.markdown('<meta http-equiv="refresh" content="1">', unsafe_allow_html=True)
-
         # Прогресс по упражнениям
         _total_ex = len(_exercises)
         st.progress((_ei) / _total_ex)
@@ -2029,8 +2026,6 @@ if _active_tab == "workout":
                         st.rerun()
                 with _rc2:
                     st.button("🔄", help="Обновить таймер", use_container_width=True)
-                # Авто-обновление каждую секунду
-                st.markdown(f'<meta http-equiv="refresh" content="1">', unsafe_allow_html=True)
 
         else:
             # Кнопка выполнения подхода
@@ -2068,6 +2063,10 @@ if _active_tab == "workout":
         if st.button(f"🏁 {t(lang, 'workout_finish')}", use_container_width=False):
             st.session_state.wk_finished = True
             st.rerun()
+
+        # Обновляем секундомер каждую секунду (сохраняет session_state)
+        _time.sleep(1)
+        st.rerun()
 
     # ── ФАЗА 3: Тренировка завершена ────────────────────────
     elif _wk.wk_finished:
