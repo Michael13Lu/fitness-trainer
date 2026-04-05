@@ -47,7 +47,8 @@ if "gcal_creds" not in st.session_state:
     st.session_state.gcal_creds = None
 
 _params = st.query_params
-if "code" in _params and st.session_state.gcal_creds is None:
+_is_spotify_cb = _params.get("state", "") == "spotify"
+if "code" in _params and not _is_spotify_cb and st.session_state.gcal_creds is None:
     try:
         creds = exchange_code(_params["code"], _params.get("state", ""))
         st.session_state.gcal_creds = creds_to_dict(creds)
@@ -103,10 +104,8 @@ if "sidebar_video_id" not in st.session_state:
     st.session_state.sidebar_video_id = None
 
 # ── Spotify OAuth callback ────────────────────────────────────
-_sp_code = st.query_params.get("code")
-_sp_error = st.query_params.get("error")
-if _sp_code and not st.session_state.get("sp_user_token"):
-    _tok_data = _spotify_exchange_code(_sp_code)
+if st.query_params.get("state") == "spotify" and st.query_params.get("code"):
+    _tok_data = _spotify_exchange_code(st.query_params["code"])
     if _tok_data and _tok_data.get("access_token"):
         st.session_state.sp_user_token = _tok_data["access_token"]
         st.session_state.sp_refresh_token = _tok_data.get("refresh_token", "")
@@ -197,6 +196,7 @@ def _spotify_auth_url() -> str | None:
         "response_type": "code",
         "redirect_uri": redirect_uri,
         "scope": "playlist-read-private playlist-read-collaborative",
+        "state": "spotify",
         "show_dialog": "false",
     }
     return "https://accounts.spotify.com/authorize?" + _up.urlencode(params)
