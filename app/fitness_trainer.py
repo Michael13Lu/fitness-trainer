@@ -1923,7 +1923,7 @@ if _active_tab == "workout":
             with _c4:
                 st.session_state.wk_exercises[_ei]["weight"] = st.number_input(
                     t(lang, "workout_weight_label"), value=float(_ex["weight"]), min_value=0.0,
-                    key=f"wex_wt_{_ei}", label_visibility="collapsed")
+                    step=0.5, key=f"wex_wt_{_ei}", label_visibility="collapsed")
             with _c5:
                 st.session_state.wk_exercises[_ei]["rest"] = st.number_input(
                     t(lang, "workout_rest_default"), value=int(_ex.get("rest", _rest_default)),
