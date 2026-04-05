@@ -1978,6 +1978,9 @@ if _active_tab == "workout":
         _m, _s = divmod(_rem, 60)
         _stopwatch_str = f"{_h:02d}:{_m:02d}:{_s:02d}" if _h else f"{_m:02d}:{_s:02d}"
 
+        # Авто-обновление каждую секунду для секундомера
+        st.markdown('<meta http-equiv="refresh" content="1">', unsafe_allow_html=True)
+
         # Прогресс по упражнениям
         _total_ex = len(_exercises)
         st.progress((_ei) / _total_ex)
