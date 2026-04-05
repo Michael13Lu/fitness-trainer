@@ -103,16 +103,6 @@ for _k, _v in _PROFILE_DEFAULTS.items():
 if "sidebar_video_id" not in st.session_state:
     st.session_state.sidebar_video_id = None
 
-# ── Spotify OAuth callback ────────────────────────────────────
-if st.query_params.get("state") == "spotify" and st.query_params.get("code"):
-    _tok_data = _spotify_exchange_code(st.query_params["code"])
-    if _tok_data and _tok_data.get("access_token"):
-        st.session_state.sp_user_token = _tok_data["access_token"]
-        st.session_state.sp_refresh_token = _tok_data.get("refresh_token", "")
-    st.query_params.clear()
-    st.rerun()
-
-
 @st.cache_data(ttl=300, show_spinner=False)
 def _yt_search(query: str) -> list[tuple[str, str]]:
     """Return list of (video_id, title) via YouTube suggest API (no key needed)."""
@@ -264,6 +254,16 @@ def _spotify_my_playlists(token: str) -> list[tuple[str, str, str]]:
         return []
     items = r.json().get("items", [])
     return [(p["id"], p["name"], p.get("type", "playlist")) for p in items if p]
+
+
+# ── Spotify OAuth callback ────────────────────────────────────
+if st.query_params.get("state") == "spotify" and st.query_params.get("code"):
+    _tok_data = _spotify_exchange_code(st.query_params["code"])
+    if _tok_data and _tok_data.get("access_token"):
+        st.session_state.sp_user_token = _tok_data["access_token"]
+        st.session_state.sp_refresh_token = _tok_data.get("refresh_token", "")
+    st.query_params.clear()
+    st.rerun()
 
 
 def _spotify_search(query: str, token: str) -> list[tuple[str, str]]:
