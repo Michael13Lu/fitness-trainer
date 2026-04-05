@@ -1877,12 +1877,20 @@ if _active_tab == "workout":
         _rest_default = 60
 
         # Список упражнений для редактирования
+        def _parse_ex(name: str) -> dict:
+            """Extract sets, reps, weight from exercise name like '3 x 10 @ 40kg' or '3×10 @ 25кг'."""
+            nums = re.findall(r'[\d]+(?:[.,]\d+)?', name)
+            floats = [float(n.replace(',', '.')) for n in nums]
+            sets   = int(floats[0]) if len(floats) >= 1 else 3
+            reps   = int(floats[1]) if len(floats) >= 2 else 10
+            weight = floats[2]      if len(floats) >= 3 else 0.0
+            return {"name": name, "sets": sets, "reps": reps, "weight": weight, "rest": _rest_default}
+
         if _source != t(lang, "workout_custom") and _source in _day_options:
             # Заполнить из программы
             if st.session_state.get("wk_last_source") != _source:
                 st.session_state.wk_exercises = [
-                    {"name": _ex, "sets": 3, "reps": 10, "weight": 0.0, "rest": _rest_default}
-                    for _ex in _day_options[_source]
+                    _parse_ex(_ex) for _ex in _day_options[_source]
                 ]
                 st.session_state.wk_last_source = _source
 
