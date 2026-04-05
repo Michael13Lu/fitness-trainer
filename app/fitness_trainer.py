@@ -169,7 +169,10 @@ def _spotify_search(query: str, token: str) -> list[tuple[str, str]]:
         params={"q": query, "type": "track", "limit": 6},
         timeout=10,
     )
-    items = r.json().get("tracks", {}).get("items", [])
+    if not r.ok:
+        raise RuntimeError(f"Spotify API {r.status_code}: {r.text[:200]}")
+    data = r.json()
+    items = data.get("tracks", {}).get("items", [])
     return [(t["id"], f"{t['name']} — {t['artists'][0]['name']}") for t in items if t]
 
 
@@ -403,13 +406,17 @@ with st.sidebar:
                 else:
                     # Поиск через API — получаем токен снаружи кеша
                     _sp_tok = _spotify_token()
-                    if _sp_tok is None:
+                    if not _sp_tok:
                         st.caption("Для поиска треков добавь SPOTIFY_CLIENT_ID и SPOTIFY_CLIENT_SECRET в .env")
                         _q = _sp_custom.replace(" ", "%20")
                         st.link_button("🔍 Открыть поиск в Spotify",
                                        f"https://open.spotify.com/search/{_q}", use_container_width=True)
                     else:
-                        _sp_results = _spotify_search(_sp_custom, _sp_tok)
+                        try:
+                            _sp_results = _spotify_search(_sp_custom, _sp_tok)
+                        except Exception as _e:
+                            st.error(str(_e))
+                            _sp_results = []
                         if _sp_results:
                             _sp_labels = [label for _, label in _sp_results]
                             _sp_sel = st.selectbox("Треки", _sp_labels,
@@ -419,7 +426,7 @@ with st.sidebar:
                                 f"https://open.spotify.com/embed/track/{_sp_track_id}?utm_source=generator&theme=0",
                                 height=152
                             )
-                        else:
+                        elif not _sp_results:
                             st.caption("Ничего не найдено")
             else:
                 components.iframe(
