@@ -317,10 +317,10 @@ with st.sidebar:
 
         if _music_service == "YouTube Music":
             _yt_streams = {
+                "🏋️ Workout Mix (24/7)": "kAUVOHB3XYM",
+                "⚡ EDM / Electronic (24/7)": "d8Oc90QevaI",
+                "🎧 Hip-Hop (24/7)": "r7eFY9YYTdE",
                 "🧘 Lofi / Chill (24/7)": "jfKfPfyJRdk",
-                "🏋️ Workout Mix (24/7)": "4xDzrJKXOOY",
-                "⚡ EDM / Electronic (24/7)": "36YnV9STBqc",
-                "🎧 Hip-Hop Beats (24/7)": "HuFYqnbVbzY",
             }
             _yt_query = st.text_input(
                 "search", placeholder="🔍 Найти на YouTube...",
