@@ -102,6 +102,38 @@ for _k, _v in _PROFILE_DEFAULTS.items():
 if "sidebar_video_id" not in st.session_state:
     st.session_state.sidebar_video_id = None
 
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _yt_search(query: str) -> list[tuple[str, str]]:
+    """Return list of (video_id, title) for YouTube search query."""
+    try:
+        import innertube
+        c = innertube.InnerTube("WEB")
+        r = c.search(query)
+
+        def _walk(obj, out, depth=0):
+            if depth > 20 or len(out) >= 6:
+                return
+            if isinstance(obj, dict):
+                if "videoId" in obj and "title" in obj:
+                    title = obj["title"]
+                    if isinstance(title, dict):
+                        runs = title.get("runs", [])
+                        title = runs[0].get("text", "") if runs else title.get("simpleText", "")
+                    out.append((obj["videoId"], str(title)))
+                for v in obj.values():
+                    _walk(v, out, depth + 1)
+            elif isinstance(obj, list):
+                for item in obj:
+                    _walk(item, out, depth + 1)
+
+        results: list[tuple[str, str]] = []
+        _walk(r, results)
+        return results
+    except Exception:
+        return []
+
+
 with st.sidebar:
     c1, c2, c3 = st.columns(3)
     with c1:
@@ -601,37 +633,6 @@ def get_chain_input(user_input: str) -> dict:
         "history": st.session_state.history.messages,
         "input": user_input,
     }
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def _yt_search(query: str) -> list[tuple[str, str]]:
-    """Return list of (video_id, title) for YouTube search query."""
-    try:
-        import innertube
-        c = innertube.InnerTube("WEB")
-        r = c.search(query)
-
-        def _walk(obj, out, depth=0):
-            if depth > 20 or len(out) >= 6:
-                return
-            if isinstance(obj, dict):
-                if "videoId" in obj and "title" in obj:
-                    title = obj["title"]
-                    if isinstance(title, dict):
-                        runs = title.get("runs", [])
-                        title = runs[0].get("text", "") if runs else title.get("simpleText", "")
-                    out.append((obj["videoId"], str(title)))
-                for v in obj.values():
-                    _walk(v, out, depth + 1)
-            elif isinstance(obj, list):
-                for item in obj:
-                    _walk(item, out, depth + 1)
-
-        results: list[tuple[str, str]] = []
-        _walk(r, results)
-        return results
-    except Exception:
-        return []
 
 
 def transcribe_audio(audio_bytes: bytes) -> str:
