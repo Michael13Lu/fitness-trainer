@@ -1872,11 +1872,15 @@ if _active_tab == "workout":
 
         _col_sel, _col_rest = st.columns([2, 1])
         with _col_sel:
+            st.caption(t(lang, "workout_select_day"))
             _source_options = [t(lang, "workout_custom")] + list(_day_options.keys())
-            _source = st.selectbox(t(lang, "workout_select_day"), _source_options, key="wk_source")
+            _source = st.selectbox(t(lang, "workout_select_day"), _source_options,
+                                   key="wk_source", label_visibility="collapsed")
         with _col_rest:
+            st.caption(t(lang, "workout_rest_timer"))
             _rest_default = st.number_input(t(lang, "workout_rest_timer"), min_value=10, max_value=300,
-                                             value=60, step=5, key="wk_rest_default_input")
+                                             value=60, step=5, key="wk_rest_default_input",
+                                             label_visibility="collapsed")
 
         # Список упражнений для редактирования
         if _source != t(lang, "workout_custom") and _source in _day_options:
