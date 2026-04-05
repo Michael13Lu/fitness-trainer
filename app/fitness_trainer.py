@@ -234,34 +234,36 @@ with st.sidebar:
         st.session_state.music_service_idx = ["YouTube Music", "SoundCloud", "Radio.garden", "DI.FM", "Spotify"].index(_music_service)
 
         if _music_service == "YouTube Music":
-            # YouTube запрещает embed плейлистов — используем прямые стримы и ссылки
             _yt_streams = {
-                "🧘 Lofi / Chill (24/7)": ("jfKfPfyJRdk", "https://www.youtube.com/watch?v=jfKfPfyJRdk"),
-                "🏋️ Workout Mix (24/7)": ("4xDzrJKXOOY", "https://www.youtube.com/watch?v=4xDzrJKXOOY"),
-                "⚡ EDM / Electronic (24/7)": ("36YnV9STBqc", "https://www.youtube.com/watch?v=36YnV9STBqc"),
-                "🎧 Hip-Hop Beats (24/7)": ("HuFYqnbVbzY", "https://www.youtube.com/watch?v=HuFYqnbVbzY"),
+                "🧘 Lofi / Chill (24/7)": "jfKfPfyJRdk",
+                "🏋️ Workout Mix (24/7)": "4xDzrJKXOOY",
+                "⚡ EDM / Electronic (24/7)": "36YnV9STBqc",
+                "🎧 Hip-Hop Beats (24/7)": "HuFYqnbVbzY",
             }
-            _genre = st.selectbox("Stream", list(_yt_streams.keys()), label_visibility="collapsed")
-            _yt_custom = st.text_input(
-                "search", placeholder="Вставь ссылку YouTube или название...",
+            _yt_query = st.text_input(
+                "search", placeholder="🔍 Найти на YouTube...",
                 label_visibility="collapsed",
                 key="yt_custom_input"
             )
-            import re as _re
-            if _yt_custom:
-                _yt_match = _re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})', _yt_custom)
-                if _yt_match:
-                    _yt_vid = _yt_match.group(1)
-                    components.iframe(f"https://www.youtube.com/embed/{_yt_vid}?autoplay=0", height=140)
-                    st.link_button("▶ Открыть на YouTube", f"https://www.youtube.com/watch?v={_yt_vid}", use_container_width=True)
+            if _yt_query:
+                # Прямая ссылка → парсим ID
+                _yt_url_match = re.search(r'(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})', _yt_query)
+                if _yt_url_match:
+                    _yt_vid = _yt_url_match.group(1)
+                    components.iframe(f"https://www.youtube.com/embed/{_yt_vid}?autoplay=0", height=150)
                 else:
-                    _q = _yt_custom.replace(" ", "+")
-                    st.link_button("🔍 Найти на YouTube: " + _yt_custom,
-                                   f"https://www.youtube.com/results?search_query={_q}", use_container_width=True)
+                    # Поиск — показываем результаты в плеере
+                    _yt_results = _yt_search(_yt_query)
+                    if _yt_results:
+                        _yt_labels = [t[:50] for _, t in _yt_results]
+                        _yt_sel = st.selectbox("Результаты", _yt_labels, label_visibility="collapsed", key="yt_result_sel")
+                        _yt_vid = _yt_results[_yt_labels.index(_yt_sel)][0]
+                        components.iframe(f"https://www.youtube.com/embed/{_yt_vid}?autoplay=0", height=150)
+                    else:
+                        st.caption("Ничего не найдено")
             else:
-                _vid_id, _yt_link = _yt_streams[_genre]
-                components.iframe(f"https://www.youtube.com/embed/{_vid_id}?autoplay=0", height=140)
-                st.link_button("▶ Открыть на YouTube", _yt_link, use_container_width=True)
+                _genre = st.selectbox("Stream", list(_yt_streams.keys()), label_visibility="collapsed")
+                components.iframe(f"https://www.youtube.com/embed/{_yt_streams[_genre]}?autoplay=0", height=150)
 
         elif _music_service == "SoundCloud":
             _sc_tracks = {
@@ -599,6 +601,37 @@ def get_chain_input(user_input: str) -> dict:
         "history": st.session_state.history.messages,
         "input": user_input,
     }
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _yt_search(query: str) -> list[tuple[str, str]]:
+    """Return list of (video_id, title) for YouTube search query."""
+    try:
+        import innertube
+        c = innertube.InnerTube("WEB")
+        r = c.search(query)
+
+        def _walk(obj, out, depth=0):
+            if depth > 20 or len(out) >= 6:
+                return
+            if isinstance(obj, dict):
+                if "videoId" in obj and "title" in obj:
+                    title = obj["title"]
+                    if isinstance(title, dict):
+                        runs = title.get("runs", [])
+                        title = runs[0].get("text", "") if runs else title.get("simpleText", "")
+                    out.append((obj["videoId"], str(title)))
+                for v in obj.values():
+                    _walk(v, out, depth + 1)
+            elif isinstance(obj, list):
+                for item in obj:
+                    _walk(item, out, depth + 1)
+
+        results: list[tuple[str, str]] = []
+        _walk(r, results)
+        return results
+    except Exception:
+        return []
 
 
 def transcribe_audio(audio_bytes: bytes) -> str:
