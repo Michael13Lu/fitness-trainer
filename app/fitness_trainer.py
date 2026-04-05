@@ -1827,6 +1827,8 @@ if _active_tab == "workout":
     def _wk_init():
         if "wk_exercises" not in st.session_state:
             st.session_state.wk_exercises = []   # [{name, sets, reps, weight, rest}]
+        if "wk_notes" not in st.session_state:
+            st.session_state.wk_notes = []       # [{ex_name, text}]
         if "wk_started" not in st.session_state:
             st.session_state.wk_started = False
         if "wk_start_ts" not in st.session_state:
@@ -2083,6 +2085,47 @@ if _active_tab == "workout":
                     st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
 
+            # Заметки к упражнению
+            with st.expander("📝 Заметка", expanded=False):
+                _note_col, _mic_col = st.columns([5, 1])
+                with _note_col:
+                    _note_text = st.text_area("Текст заметки", value="",
+                                              placeholder="Мысли по технике, ощущения...",
+                                              key=f"wk_note_text_{_ei}_{_si}",
+                                              label_visibility="collapsed", height=80)
+                with _mic_col:
+                    st.caption("🎙️")
+                    _note_audio = audio_recorder(
+                        text="", recording_color="#e74c3c",
+                        neutral_color="#888", icon_size="1x",
+                        key=f"wk_note_mic_{_ei}_{_si}"
+                    )
+                if _note_audio and len(_note_audio) > 1000 and _note_audio != st.session_state.get(f"wk_last_note_audio_{_ei}_{_si}"):
+                    st.session_state[f"wk_last_note_audio_{_ei}_{_si}"] = _note_audio
+                    with st.spinner("Распознаю..."):
+                        _recognized = transcribe_audio(_note_audio)
+                    if _recognized:
+                        st.session_state[f"wk_note_recognized_{_ei}_{_si}"] = _recognized
+                        st.rerun()
+                _recognized_text = st.session_state.get(f"wk_note_recognized_{_ei}_{_si}", "")
+                if _recognized_text:
+                    st.info(f"🎙️ {_recognized_text}")
+                _final_note = _recognized_text or _note_text
+                if _final_note and st.button("💾 Сохранить заметку", key=f"wk_note_save_{_ei}_{_si}"):
+                    st.session_state.wk_notes.append({
+                        "ex_name": _cur_ex["name"],
+                        "set": _si + 1,
+                        "text": _final_note,
+                    })
+                    st.session_state.pop(f"wk_note_recognized_{_ei}_{_si}", None)
+                    st.success("Заметка сохранена")
+                # Показываем заметки к текущему упражнению
+                _ex_notes = [n for n in st.session_state.wk_notes if n["ex_name"] == _cur_ex["name"]]
+                if _ex_notes:
+                    st.markdown("**Заметки:**")
+                    for _n in _ex_notes:
+                        st.markdown(f"• Подход {_n['set']}: {_n['text']}")
+
             # Кнопка выполнения подхода
             _btn_label = (t(lang, "workout_next_ex")
                           if _si + 1 >= _total_sets
@@ -2165,10 +2208,16 @@ if _active_tab == "workout":
             st.markdown(f"{_icon} **{_ex['name']}** — {_sets_done}/{_ex['sets']} подходов"
                         + (f" @ {_ex['weight']:.1f}кг" if _ex['weight'] > 0 else ""))
 
+        if st.session_state.wk_notes:
+            st.divider()
+            st.subheader("📝 Заметки тренировки")
+            for _n in st.session_state.wk_notes:
+                st.markdown(f"**{_n['ex_name']}** (подход {_n['set']}): {_n['text']}")
+
         st.divider()
         if st.button("🔄 Новая тренировка", use_container_width=True):
             for _k in ["wk_started", "wk_start_ts", "wk_ex_idx", "wk_set_idx",
                        "wk_resting", "wk_rest_end", "wk_done_sets", "wk_finished",
-                       "wk_exercises", "wk_last_source", "wk_saved_to_diary"]:
+                       "wk_exercises", "wk_last_source", "wk_saved_to_diary", "wk_notes"]:
                 st.session_state.pop(_k, None)
             st.rerun()
