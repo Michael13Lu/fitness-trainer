@@ -317,10 +317,24 @@ with st.sidebar:
 
         if _music_service == "YouTube Music":
             _yt_streams = {
-                "🏋️ Workout Mix (24/7)": "kAUVOHB3XYM",
-                "⚡ EDM / Electronic (24/7)": "d8Oc90QevaI",
-                "🎧 Hip-Hop (24/7)": "r7eFY9YYTdE",
-                "🧘 Lofi / Chill (24/7)": "jfKfPfyJRdk",
+                "🏋️ Workout Mix": "kAUVOHB3XYM",
+                "🔥 High Intensity": "SL4kgcr42-s",
+                "⚡ EDM / Electronic": "WsDyRAPFBC8",
+                "🎵 Progressive House": "d8Oc90QevaI",
+                "🎶 Tech House": "XL8V37LDmu0",
+                "🌊 Deep House": "WsDyRAPFBC8",
+                "🌀 Trance": "2NgXb5lrYTU",
+                "🎧 Techno": "G-u5OhIeln4",
+                "💥 Hardstyle": "8pWuOd7_Y9s",
+                "🥁 Drum & Bass": "Cwq3AFyV044",
+                "🎸 Rock": "3LWMFjRZQ6k",
+                "💀 Metal": "nFLPs44uzcY",
+                "🥊 Hip-Hop": "r7eFY9YYTdE",
+                "🌴 Reggaeton": "y60gnXiNTOk",
+                "🧘 Lofi / Chill": "jfKfPfyJRdk",
+                "🌙 Night Vibes": "rUDi-JPUoLU",
+                "🎹 Piano / Focus": "TtkFsfOP9QI",
+                "🌿 Meditation": "WsDyRAPFBC8",
             }
             _yt_query = st.text_input(
                 "search", placeholder="🔍 Найти на YouTube...",
