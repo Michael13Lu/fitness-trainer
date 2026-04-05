@@ -400,43 +400,58 @@ with st.sidebar:
             st.caption("DI.FM требует аккаунт для прямого стрима.")
 
         elif _music_service == "Spotify":
-            _sp_playlists = {
-                "🏋️ Workout": "37i9dQZF1DX76Wlfdnj7AP",
-                "⚡ Power Workout": "37i9dQZF1DXdxkSvqMcMKd",
-                "🎧 Electronic": "37i9dQZF1DX4dyzvuaRJ0n",
-                "🥊 Hip-Hop": "37i9dQZF1DX0XUsuxWHRQd",
-                "🎸 Rock Workout": "37i9dQZF1DX35oM5IDVEhA",
-                "🧘 Chill Hits": "37i9dQZF1DX4WYpdgoIcn6",
+            # Инициализируем кастомные пресеты
+            if "sp_custom_presets" not in st.session_state:
+                st.session_state.sp_custom_presets = {}
+
+            _sp_builtin = {
+                "🏋️ Workout": ("playlist", "37i9dQZF1DX76Wlfdnj7AP"),
+                "⚡ Power Workout": ("playlist", "37i9dQZF1DXdxkSvqMcMKd"),
+                "💪 Beast Mode": ("playlist", "37i9dQZF1DXaXBGp3LMnOm"),
+                "🔥 Cardio": ("playlist", "37i9dQZF1DWSJHnPb1f0X3"),
+                "🎧 Electronic": ("playlist", "37i9dQZF1DX4dyzvuaRJ0n"),
+                "🌊 Deep House": ("playlist", "37i9dQZF1DX2TRYkJECvfC"),
+                "🌀 Trance": ("playlist", "37i9dQZF1DX91oIci4su1D"),
+                "🥊 Hip-Hop": ("playlist", "37i9dQZF1DX0XUsuxWHRQd"),
+                "🎸 Rock Workout": ("playlist", "37i9dQZF1DX35oM5IDVEhA"),
+                "💀 Metal": ("playlist", "37i9dQZF1DWWOaP4H0w5b0"),
+                "🌴 Latin / Reggaeton": ("playlist", "37i9dQZF1DX10zKzsJ2jva"),
+                "🧘 Chill Hits": ("playlist", "37i9dQZF1DX4WYpdgoIcn6"),
+                "🎹 Piano Focus": ("playlist", "37i9dQZF1DX4sWSpwq3LiO"),
+                "🌿 Meditation": ("playlist", "37i9dQZF1DWZqd5JICZI0u"),
             }
-            _sp_pl = st.selectbox("Playlist", list(_sp_playlists.keys()), label_visibility="collapsed")
-            _sp_custom = st.text_input(
-                "search", placeholder="🔍 Найти трек или вставь ссылку Spotify...",
-                label_visibility="collapsed",
-                key="sp_custom_input"
-            )
-            _sp_id = _sp_playlists[_sp_pl]
-            _sp_type = "playlist"
-            if _sp_custom:
-                _sp_url_match = re.search(r'spotify\.com/(playlist|album|track)/([A-Za-z0-9]+)', _sp_custom)
+            # Объединяем встроенные и кастомные
+            _sp_all = {**_sp_builtin, **{k: ("custom", v) for k, v in st.session_state.sp_custom_presets.items()}}
+            _sp_pl = st.selectbox("Playlist", list(_sp_all.keys()), label_visibility="collapsed")
+            _sp_type, _sp_id = _sp_all[_sp_pl]
+
+            # Показываем плеер
+            if _sp_type == "custom":
+                _sp_url_match = re.search(r'spotify\.com/(playlist|album|track)/([A-Za-z0-9]+)', _sp_id)
                 if _sp_url_match:
-                    # Прямая ссылка → встраиваем
                     _sp_type, _sp_id = _sp_url_match.group(1), _sp_url_match.group(2)
-                    components.iframe(
-                        f"https://open.spotify.com/embed/{_sp_type}/{_sp_id}?utm_source=generator&theme=0",
-                        height=152
-                    )
-                else:
-                    # Поиск — открываем в Spotify (API требует Premium)
-                    _q = _sp_custom.replace(" ", "%20")
-                    st.link_button("🔍 Найти в Spotify: " + _sp_custom,
-                                   f"https://open.spotify.com/search/{_q}",
-                                   use_container_width=True)
-                    st.caption("Вставь ссылку на трек/плейлист чтобы встроить плеер.")
-            else:
-                components.iframe(
-                    f"https://open.spotify.com/embed/playlist/{_sp_id}?utm_source=generator&theme=0",
-                    height=152
-                )
+            components.iframe(
+                f"https://open.spotify.com/embed/{_sp_type}/{_sp_id}?utm_source=generator&theme=0",
+                height=152
+            )
+
+            # Добавить/удалить кастомный пресет
+            with st.expander("➕ Добавить свой пресет"):
+                _new_name = st.text_input("Название", placeholder="Моя тренировка", key="sp_new_name")
+                _new_url = st.text_input("Ссылка Spotify", placeholder="https://open.spotify.com/playlist/...", key="sp_new_url")
+                if st.button("Сохранить", use_container_width=True, key="sp_save_preset"):
+                    if _new_name and _new_url and re.search(r'spotify\.com/(playlist|album|track)/[A-Za-z0-9]+', _new_url):
+                        st.session_state.sp_custom_presets[_new_name] = _new_url
+                        st.rerun()
+                    else:
+                        st.caption("Введи название и корректную ссылку Spotify.")
+                # Удалить кастомный пресет
+                if st.session_state.sp_custom_presets:
+                    _del = st.selectbox("Удалить", ["—"] + list(st.session_state.sp_custom_presets.keys()),
+                                        label_visibility="collapsed", key="sp_del_preset")
+                    if _del != "—" and st.button("🗑️ Удалить", key="sp_del_btn"):
+                        del st.session_state.sp_custom_presets[_del]
+                        st.rerun()
 
 # Читаем профиль из session_state (всегда доступны)
 name = _prof["name"]
