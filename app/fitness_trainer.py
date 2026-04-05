@@ -102,6 +102,17 @@ for _k, _v in _PROFILE_DEFAULTS.items():
 if "sidebar_video_id" not in st.session_state:
     st.session_state.sidebar_video_id = None
 
+# ── Spotify OAuth callback ────────────────────────────────────
+_sp_code = st.query_params.get("code")
+_sp_error = st.query_params.get("error")
+if _sp_code and not st.session_state.get("sp_user_token"):
+    _tok_data = _spotify_exchange_code(_sp_code)
+    if _tok_data and _tok_data.get("access_token"):
+        st.session_state.sp_user_token = _tok_data["access_token"]
+        st.session_state.sp_refresh_token = _tok_data.get("refresh_token", "")
+    st.query_params.clear()
+    st.rerun()
+
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _yt_search(query: str) -> list[tuple[str, str]]:
@@ -166,6 +177,93 @@ def _spotify_token() -> str | None:
         timeout=5,
     )
     return r.json().get("access_token")
+
+
+def _spotify_auth_url() -> str | None:
+    """Build Spotify OAuth URL for user login (Authorization Code flow)."""
+    cid, _ = _get_spotify_creds()
+    if not cid:
+        return None
+    import urllib.parse as _up
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "")
+    try:
+        redirect_uri = redirect_uri or st.secrets.get("SPOTIFY_REDIRECT_URI", "")
+    except Exception:
+        pass
+    if not redirect_uri:
+        return None
+    params = {
+        "client_id": cid,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "scope": "playlist-read-private playlist-read-collaborative",
+        "show_dialog": "false",
+    }
+    return "https://accounts.spotify.com/authorize?" + _up.urlencode(params)
+
+
+def _spotify_exchange_code(code: str) -> dict | None:
+    """Exchange auth code for access + refresh tokens."""
+    cid, csec = _get_spotify_creds()
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "")
+    try:
+        redirect_uri = redirect_uri or st.secrets.get("SPOTIFY_REDIRECT_URI", "")
+    except Exception:
+        pass
+    if not cid or not redirect_uri:
+        return None
+    import requests as _req, base64 as _b64
+    auth = _b64.b64encode(f"{cid}:{csec}".encode()).decode()
+    r = _req.post(
+        "https://accounts.spotify.com/api/token",
+        headers={"Authorization": f"Basic {auth}"},
+        data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri},
+        timeout=10,
+    )
+    return r.json() if r.ok else None
+
+
+def _spotify_refresh(refresh_token: str) -> str | None:
+    """Refresh access token."""
+    cid, csec = _get_spotify_creds()
+    if not cid:
+        return None
+    import requests as _req, base64 as _b64
+    auth = _b64.b64encode(f"{cid}:{csec}".encode()).decode()
+    r = _req.post(
+        "https://accounts.spotify.com/api/token",
+        headers={"Authorization": f"Basic {auth}"},
+        data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+        timeout=10,
+    )
+    return r.json().get("access_token") if r.ok else None
+
+
+def _spotify_user_token() -> str | None:
+    """Return valid user access token, refreshing if needed."""
+    tok = st.session_state.get("sp_user_token")
+    ref = st.session_state.get("sp_refresh_token")
+    if not tok and ref:
+        tok = _spotify_refresh(ref)
+        if tok:
+            st.session_state.sp_user_token = tok
+    return tok
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _spotify_my_playlists(token: str) -> list[tuple[str, str, str]]:
+    """Return list of (id, name, type) for current user's playlists."""
+    import requests as _req
+    r = _req.get(
+        "https://api.spotify.com/v1/me/playlists",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"limit": 50},
+        timeout=10,
+    )
+    if not r.ok:
+        return []
+    items = r.json().get("items", [])
+    return [(p["id"], p["name"], p.get("type", "playlist")) for p in items if p]
 
 
 def _spotify_search(query: str, token: str) -> list[tuple[str, str]]:
@@ -400,7 +498,6 @@ with st.sidebar:
             st.caption("DI.FM требует аккаунт для прямого стрима.")
 
         elif _music_service == "Spotify":
-            # Инициализируем кастомные пресеты
             if "sp_custom_presets" not in st.session_state:
                 st.session_state.sp_custom_presets = {}
 
@@ -420,12 +517,34 @@ with st.sidebar:
                 "🎹 Piano Focus": ("playlist", "37i9dQZF1DX4sWSpwq3LiO"),
                 "🌿 Meditation": ("playlist", "37i9dQZF1DWZqd5JICZI0u"),
             }
-            # Объединяем встроенные и кастомные
-            _sp_all = {**_sp_builtin, **{k: ("custom", v) for k, v in st.session_state.sp_custom_presets.items()}}
+
+            # ── Мои плейлисты (если залогинен) ──────────────
+            _sp_user_tok = _spotify_user_token()
+            if _sp_user_tok:
+                _my_lists = _spotify_my_playlists(_sp_user_tok)
+                _my_dict = {f"👤 {n}": ("playlist", pid) for pid, n, _ in _my_lists}
+                st.caption("✅ Spotify подключён")
+                if st.button("🚪 Выйти", key="sp_logout", use_container_width=True):
+                    st.session_state.pop("sp_user_token", None)
+                    st.session_state.pop("sp_refresh_token", None)
+                    st.rerun()
+            else:
+                _my_dict = {}
+                _auth_url = _spotify_auth_url()
+                if _auth_url:
+                    st.link_button("🔑 Войти в Spotify", _auth_url, use_container_width=True)
+                else:
+                    st.caption("Добавь SPOTIFY_REDIRECT_URI в Secrets для входа.")
+
+            # Объединяем: мои → встроенные → кастомные
+            _sp_all = {
+                **_my_dict,
+                **_sp_builtin,
+                **{k: ("custom", v) for k, v in st.session_state.sp_custom_presets.items()},
+            }
             _sp_pl = st.selectbox("Playlist", list(_sp_all.keys()), label_visibility="collapsed")
             _sp_type, _sp_id = _sp_all[_sp_pl]
 
-            # Показываем плеер
             if _sp_type == "custom":
                 _sp_url_match = re.search(r'spotify\.com/(playlist|album|track)/([A-Za-z0-9]+)', _sp_id)
                 if _sp_url_match:
@@ -445,7 +564,6 @@ with st.sidebar:
                         st.rerun()
                     else:
                         st.caption("Введи название и корректную ссылку Spotify.")
-                # Удалить кастомный пресет
                 if st.session_state.sp_custom_presets:
                     _del = st.selectbox("Удалить", ["—"] + list(st.session_state.sp_custom_presets.keys()),
                                         label_visibility="collapsed", key="sp_del_preset")
