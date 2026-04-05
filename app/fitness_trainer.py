@@ -234,46 +234,48 @@ with st.sidebar:
         st.session_state.music_service_idx = ["YouTube Music", "SoundCloud", "Radio.garden", "DI.FM", "Spotify"].index(_music_service)
 
         if _music_service == "YouTube Music":
-            _yt_genres = {
-                "🏋️ Workout": "https://www.youtube.com/embed/videoseries?list=PLFPg_IUxqnZNnACUGsfn50DkRz5G5POSITN",
-                "⚡ High Energy": "https://www.youtube.com/embed/videoseries?list=PLw-VjHDlEOgs_nCxlK52tKpEwLmG-TRcd",
-                "🎧 EDM / Electronic": "https://www.youtube.com/embed/videoseries?list=PLhInz4M-OzRoE8_vHq3yHEbhDLp93Ob4d",
-                "🥊 Hip-Hop / Rap": "https://www.youtube.com/embed/videoseries?list=PLDIoUOhQQPlXr63I_vwF06FF23k2HoIJz",
-                "🎸 Rock": "https://www.youtube.com/embed/videoseries?list=PLgzTt0k8mXzEk586ze4BjvDXR7c-TUSnx",
-                "🧘 Chill / Lofi": "https://www.youtube.com/embed/videoseries?list=PLofht4PTcKYnaH8w5olJCFoL6tFpiqgrF",
+            # YouTube запрещает embed плейлистов — используем прямые стримы и ссылки
+            _yt_streams = {
+                "🧘 Lofi / Chill (24/7)": ("jfKfPfyJRdk", "https://www.youtube.com/watch?v=jfKfPfyJRdk"),
+                "🏋️ Workout Mix (24/7)": ("4xDzrJKXOOY", "https://www.youtube.com/watch?v=4xDzrJKXOOY"),
+                "⚡ EDM / Electronic (24/7)": ("36YnV9STBqc", "https://www.youtube.com/watch?v=36YnV9STBqc"),
+                "🎧 Hip-Hop Beats (24/7)": ("HuFYqnbVbzY", "https://www.youtube.com/watch?v=HuFYqnbVbzY"),
             }
-            _genre = st.selectbox("Genre", list(_yt_genres.keys()), label_visibility="collapsed")
-            _embed_url = _yt_genres[_genre]
-            components.iframe(_embed_url, height=120)
-            st.caption("▶ Open YouTube for full player")
+            _genre = st.selectbox("Stream", list(_yt_streams.keys()), label_visibility="collapsed")
+            _vid_id, _yt_link = _yt_streams[_genre]
+            components.iframe(
+                f"https://www.youtube.com/embed/{_vid_id}?autoplay=0",
+                height=140
+            )
+            st.link_button("▶ Открыть на YouTube", _yt_link, use_container_width=True)
 
         elif _music_service == "SoundCloud":
-            _sc_playlists = {
-                "🏋️ Workout Beats": "https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/soundcloud-shine/sets/workout&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false",
-                "⚡ Electronic": "https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/soundcloud-shine/sets/electronic&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false",
-                "🎧 Hip-Hop": "https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/soundcloud-shine/sets/hiphop&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false",
+            _sc_tracks = {
+                "🏋️ Workout Playlist": "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/playlists/692849086&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=false",
+                "⚡ NCS Electronic": "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/playlists/79670980&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=false",
+                "🎧 Hip-Hop Beats": "https://w.soundcloud.com/player/?url=https%3A//api.soundcloud.com/playlists/167895082&color=%23ff5500&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=false",
             }
-            _sc_genre = st.selectbox("Playlist", list(_sc_playlists.keys()), label_visibility="collapsed")
-            components.iframe(_sc_playlists[_sc_genre], height=166, scrolling=False)
+            _sc_genre = st.selectbox("Playlist", list(_sc_tracks.keys()), label_visibility="collapsed")
+            components.iframe(_sc_tracks[_sc_genre], height=166, scrolling=False)
 
         elif _music_service == "Radio.garden":
             _rg_stations = {
-                "🌍 Browse World Radio": "https://radio.garden/listen",
-                "🏋️ Energy FM (UK)": "https://radio.garden/listen/energy-fm/",
-                "🎧 Slam! FM (NL)": "https://radio.garden/listen/slam/",
-                "⚡ Kiss FM (UK)": "https://radio.garden/listen/kiss-fm-uk/",
-                "🎸 Planet Rock (UK)": "https://radio.garden/listen/planet-rock/",
+                "🏋️ Energy FM": "https://radio.garden/listen/energy-fm/",
+                "🎧 Slam! FM": "https://radio.garden/listen/slam/",
+                "⚡ Kiss FM": "https://radio.garden/listen/kiss-fm-uk/",
+                "🎸 Planet Rock": "https://radio.garden/listen/planet-rock/",
+                "🌍 Обзор мирового радио": "https://radio.garden/listen",
             }
             _rg_station = st.selectbox("Station", list(_rg_stations.keys()), label_visibility="collapsed")
-            st.link_button("📻 Open " + _rg_station.split(" ")[1] + " in Radio.garden", _rg_stations[_rg_station], use_container_width=True)
-            st.caption("Radio.garden requires opening in browser (no embed allowed).")
+            st.link_button("📻 Открыть " + _rg_station, _rg_stations[_rg_station], use_container_width=True)
+            st.caption("Radio.garden открывается в браузере (встраивание запрещено).")
 
         elif _music_service == "DI.FM":
             _di_channels = {
-                "🏋️ Workout": "progressive",
                 "⚡ Trance": "trance",
                 "🎧 Techno": "techno",
                 "🎶 House": "house",
+                "🏋️ Progressive": "progressive",
                 "🌊 Ambient": "ambient",
                 "🥁 Drum & Bass": "drumandbass",
                 "🎸 Electro": "electro",
@@ -282,9 +284,8 @@ with st.sidebar:
             _di_ch = st.selectbox("Channel", list(_di_channels.keys()), label_visibility="collapsed")
             _di_key = _di_channels[_di_ch]
             _di_url = f"https://www.di.fm/player/{_di_key}"
-            _di_stream = f"https://prem4.di.fm/{_di_key}"
-            st.audio(_di_stream, format="audio/mpeg")
-            st.link_button("🎧 Open DI.FM: " + _di_ch, _di_url, use_container_width=True)
+            st.link_button("🎧 Открыть DI.FM: " + _di_ch, _di_url, use_container_width=True)
+            st.caption("DI.FM требует аккаунт для прямого стрима.")
 
         elif _music_service == "Spotify":
             _sp_playlists = {
